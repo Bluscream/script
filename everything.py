@@ -168,6 +168,8 @@ class EverythingSearch:
     # command = f'es -size -s {" ".join([x for x in root_paths])} file:'
     #             es -size -path -path ""C:\"" | ""D:\"" !'C:\,D:\' ''
     #             es -size -path """C:\""" | """D:\""" "!'C:\Windows,C:\Boot' ''"
+    #             es -size -path """C:\""" | """D:\""" "!"C:\Windows","C:\Boot" "
+    #subprocess.CalledProcessError: Command 'es  -size -path """C:\""" | """D:\""" "!"C:\Windows","C:\Boot" "' returned non-zero exit status 255.
     def search(self, search_text:str=None, paths:list[str] = None, excluded_paths:list[str] = None):
         if not search_text: search_text = self.search_text
         if search_text: search_text = shlex.quote(search_text)

@@ -20,8 +20,7 @@ def sanitize_filename(filename:str):
     # Remove invalid characters from the filename
     if filename.endswith("/"): filename += "index.html"
     filename = filename.removeprefix("https://").removeprefix("http://").replace("//", "/")
-    sanitized = re.sub(r'[<>:"\\|?*]', '_', filename)
-    return sanitized
+    return re.sub(r'[<>:"\\|?*]', '_', filename)
 def remove_trailing_slash(string):
     if string.endswith("/"):
         string = string[:-1]
@@ -39,8 +38,7 @@ def prepend_html_banner(directory:Path, extensions:list, banner_html):
                     if not soup.find(class_='banner'):
                         banner = soup.new_tag('div', attrs={'class': 'banner'})
                         banner.string = banner_html
-                        body_tag = soup.body
-                        if body_tag:
+                        if body_tag := soup.body:
                             body_tag.insert(0, banner)
                             new_content = soup.prettify()
                             with file_path.open(mode='w') as file:

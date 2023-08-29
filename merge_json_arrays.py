@@ -40,7 +40,7 @@ parser.add_argument('--output_file', default='output.json', help='output JSON fi
 # Parse the command-line arguments
 args = parser.parse_args()
 
-if not "input_files" in args or not args.input_files:
+if "input_files" not in args or not args.input_files:
     args.input_files = [
         "G:/Steam/steamapps/common/Call of Duty Modern Warfare 2/players/favourites.json",
         "D:/Downloads/favourites.json",

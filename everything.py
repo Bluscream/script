@@ -148,8 +148,8 @@ class EverythingSearch:
         self.options = ''
         self.last_ran_command = ''
         self.search_text = ''
-        self.paths = list()
-        self.excluded_paths = list()
+        self.paths = []
+        self.excluded_paths = []
 
     def _get_paths_str(self, paths:list[str] = None):
         if not paths: paths = self.paths

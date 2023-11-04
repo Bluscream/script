@@ -17,7 +17,6 @@ def paste_text():
         return
     for char in clipboard_content:
         if keyboard.is_pressed('Esc'): break
-        if keyboard.is_pressed('Esc'): break
         keyboard.write(char)
         time.sleep(0.05)  # Adjust this value if needed
 

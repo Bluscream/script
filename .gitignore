@@ -14,3 +14,7 @@ output.json
 *.pyc
 error_codes.txt
 answer.plite
+/tasks.bat
+/bat
+/lnk
+/github/env

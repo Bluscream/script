@@ -28,7 +28,7 @@ getcontext().prec = 50
 use_everything_1_5_alpha = True
 ziplist_file = 'ziplist.efu'
 zipcontents_file = 'zipcontents.efu'
-path_separator = os.pathsep
+path_separator = '\\'
 min_archive_size_bytes = 22
 log_file = 'ziplist.log'
 
@@ -90,13 +90,12 @@ with open(zipcontents_file, 'w', newline='') as file:
         if os.path.getsize(archive) < min_archive_size_bytes:
             logger.warning(f'{archive} is too small, skipping...')
             continue
-        is_7z = py7zr.is_7zfile(archive)
-        is_zip = zipfile.is_zipfile(archive)
-        if not is_7z and not is_zip:
-            logger.error(f'{archive} not supported!')
-            continue
-        logger.debug(f'Processing {archive}...')
         try:
+            is_7z = py7zr.is_7zfile(archive)
+            is_zip = zipfile.is_zipfile(archive)
+            if not is_7z and not is_zip:
+                logger.error(f'{archive} not supported!')
+                continue
             with py7zr.SevenZipFile(archive, mode='r') if is_7z else zipfile.ZipFile(archive, 'r') as z:
                 for filename in z.getnames() if py7zr.is_7zfile(archive) else z.namelist():
                     if filename.endswith('/') or filename.endswith('\\'): continue
@@ -113,8 +112,8 @@ with open(zipcontents_file, 'w', newline='') as file:
                     attributes = info.external_attr
                     writer.writerow([virtualpath, size, modified, created, attributes])
                     # logger.debug(f'Processed file: {filename}')
+            logger.info(f'Processed {archive}...')
         except Exception as e:
-            logger.error(f'Error processing archive: {archive}')
-            logger.error(e)
+            logger.error(f'{archive}: {e}')
 
 logger.debug('Script execution completed.')

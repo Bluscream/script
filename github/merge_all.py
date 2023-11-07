@@ -12,7 +12,8 @@ parser = argparse.ArgumentParser(description='Manage GitHub repositories.')
 parser.add_argument('--user', action='store_true', default=True)
 parser.add_argument('--orgs', action='store_true', default=True)
 parser.add_argument('--list', type=str, help='File path')
-parser.add_argument('--merge', action='store_true')
+parser.add_argument('--merge', action='store_true', help='Merge all pull requests')
+parser.add_argument('--close', action='store_true', help='Close all/unmergeable pull requests')
 parser.add_argument('--public', action='store_true')
 parser.add_argument('--private', action='store_true')
 parser.add_argument('--archive', action='store_true')
@@ -50,20 +51,22 @@ orgs = user.get_orgs()
 orgs_repos = [repo for org in orgs for repo in org.get_repos()]
 
 # Define actions
-def mergePRs(repo: Repository):
+def mergePRs(repo: Repository, close=False):
     if repo.archived:
         logging.warning(f'The repository {repo_name(repo)} is archived. Skipping...')
         return
     pulls = repo.get_pulls()
     logging.info(f'Found {pulls.totalCount} pull requests in repo: {repo_name(repo)}')
     for pull in pulls:
-        if pull.mergeable:
+        if pull.mergeable and args.merge:
             pull.merge()
             logging.info(f'Merged pull request {pull.number} in repo: {repo_name(repo)}')
-        else:
+        elif close:
             pull.edit(state='closed')
             logging.info(f'Closed pull request {pull.number} in repo: {repo_name(repo)}')
-        sleep(2)
+        if pulls.totalCount > 1:
+            mergePRs(repo, close)
+            sleep(30)
 
 def makePublic(repo: Repository):
     if not repo.private:
@@ -100,8 +103,8 @@ def process_repos(repos: Repository):
             logging.debug(f"Processing repository {ok+failed+1} {repo_name(repo)}")
             if list_file:
                 list_file.writelines([f'{repo_name(repo)}'])
-            if args.merge:
-                mergePRs(repo)
+            if args.merge or args.close:
+                mergePRs(repo, args.close)
             if args.public:
                 makePublic(repo)
             if args.private:

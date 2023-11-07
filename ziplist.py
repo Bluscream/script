@@ -7,6 +7,7 @@
 
 # endregion INSTALL
 
+# region imports
 import os
 import subprocess
 from datetime import datetime
@@ -16,6 +17,7 @@ import csv
 import logging
 from decimal import Decimal, getcontext
 getcontext().prec = 50
+# endregion imports
 
 # region SETTINGS
 
@@ -24,26 +26,25 @@ use_everything_1_5_alpha = True
 ziplist_file = 'ziplist.efu'
 zipcontents_file = 'zipcontents.efu'
 path_separator = os.pathsep
+log_file = 'ziplist.log'
 
 # endregion SETTINGS
 
 
 # region logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 # Create a file handler and set the log file path
-log_file = 'debug.log'
-file_handler = logging.FileHandler(log_file)
-file_handler.setLevel(logging.DEBUG)
+if log_file:
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 # Create a console handler
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
-# Create a formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(formatter)
 console_handler.setFormatter(formatter)
-# Add the handlers to the logger
-logger.addHandler(file_handler)
 # logger.addHandler(console_handler)
 # endregion logging
 

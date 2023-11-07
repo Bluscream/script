@@ -1,5 +1,8 @@
 # !/usr/bin/env python3
 
+# https://www.voidtools.com/forum/viewtopic.php?t=1594
+# https://github.com/Bluscream/script/blob/master/ziplist.py
+
 # region INSTALL
 
 # python3 -m pip install py7zr

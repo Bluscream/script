@@ -19,6 +19,5 @@ answer.plite
 /lnk
 /github/env
 /ZIPList.txt
-/ZIPList.EFU
-debug.log
-zipcontents.EFU
+*.log
+*.EFU

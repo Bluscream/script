@@ -91,6 +91,7 @@ with open(zipcontents_file, 'w', newline='') as file:
         try:
             with py7zr.SevenZipFile(archive, mode='r') if is_7z else zipfile.ZipFile(archive, 'r') as z:
                 for filename in z.getnames() if py7zr.is_7zfile(archive) else z.namelist():
+                    if filename.endswith('/') or filename.endswith('\\'): continue
                     info = z.getinfo(filename)
                     archive = replace_pathsep(archive.replace("\"",""))
                     virtualpath = f'{archive}\\{replace_pathsep(filename)}'.replace("\"","")

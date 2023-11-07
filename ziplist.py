@@ -26,6 +26,7 @@ use_everything_1_5_alpha = True
 ziplist_file = 'ziplist.efu'
 zipcontents_file = 'zipcontents.efu'
 path_separator = os.pathsep
+min_archive_size_bytes = 22
 log_file = 'ziplist.log'
 
 # endregion SETTINGS
@@ -80,14 +81,18 @@ with open(zipcontents_file, 'w', newline='') as file:
 
     for archive in archives:
         if not os.path.isfile(archive):
-            logger.warning(f'Archive not found: {archive}')
+            logger.error(f'{archive} not found!')
+            continue
+        # if file is smaller than 22 bytes, it's probably not a valid archive
+        if os.path.getsize(archive) < min_archive_size_bytes:
+            logger.warning(f'{archive} is too small, skipping...')
             continue
         is_7z = py7zr.is_7zfile(archive)
         is_zip = zipfile.is_zipfile(archive)
         if not is_7z and not is_zip:
-            logger.warning(f'Archive not supported: {archive}')
+            logger.error(f'{archive} not supported!')
             continue
-        logger.debug(f'Processing archive: {archive}')
+        logger.debug(f'Processing {archive}...')
         try:
             with py7zr.SevenZipFile(archive, mode='r') if is_7z else zipfile.ZipFile(archive, 'r') as z:
                 for filename in z.getnames() if py7zr.is_7zfile(archive) else z.namelist():

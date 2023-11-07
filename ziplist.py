@@ -55,7 +55,7 @@ def filetime_from_datetime(dt: datetime):
 
 # Step 3: Get the list of files in all archives and save them to 'ziplist.EFU'
 logger.debug('Getting the list of files in all archives...')
-with open('zipcontents.EFU', 'w', newline='') as file:
+with open(zipcontents_file, 'w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['Filename', 'Size', 'Date Modified', 'Date Created', 'Attributes'])
 

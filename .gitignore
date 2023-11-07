@@ -20,5 +20,4 @@ answer.plite
 /github/env
 /ZIPList.txt
 *.log
-*.EFU
-!zipcontents.EFU
+*.efu

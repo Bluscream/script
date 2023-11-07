@@ -1,5 +1,14 @@
-import subprocess
+# !/usr/bin/env python3
+
+# region INSTALL
+
+# python3 -m pip install py7zr
+# python3 ziplist.py
+
+# endregion INSTALL
+
 import os
+import subprocess
 from datetime import datetime
 import zipfile
 import py7zr
@@ -8,8 +17,16 @@ import logging
 from decimal import Decimal, getcontext
 getcontext().prec = 50
 
+# region SETTINGS
+
+# edit your "Compressed" filter in Everything to change which archives are included
+use_everything_1_5_alpha = True
 ziplist_file = 'ziplist.efu'
 zipcontents_file = 'zipcontents.efu'
+path_separator = os.pathsep
+
+# endregion SETTINGS
+
 
 # region logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,7 +48,7 @@ logger.addHandler(file_handler)
 # endregion logging
 
 def es(cmd: list[str]):
-    cmd = ['es'] + cmd + ['-instance', '1.5a']
+    cmd = ['es'] + cmd + (['-instance', '1.5a'] if use_everything_1_5_alpha else [])
     logger.debug(f'Running command: {" ".join(cmd)}')
     subprocess.run(cmd)
 
@@ -52,6 +69,7 @@ with open(ziplist_file, newline='') as csvfile:
 
 def filetime_from_datetime(dt: datetime):
     return Decimal((dt - datetime(1601, 1, 1)).total_seconds() * 1_000_000) * Decimal(10)
+def replace_pathsep(text): return text.replace("/",path_separator).replace("\\",path_separator)
 
 # Step 3: Get the list of files in all archives and save them to 'ziplist.EFU'
 logger.debug('Getting the list of files in all archives...')
@@ -60,17 +78,21 @@ with open(zipcontents_file, 'w', newline='') as file:
     writer.writerow(['Filename', 'Size', 'Date Modified', 'Date Created', 'Attributes'])
 
     for archive in archives:
-        if not os.path.exists(archive):
+        if not os.path.isfile(archive):
             logger.warning(f'Archive not found: {archive}')
+            continue
+        is_7z = py7zr.is_7zfile(archive)
+        is_zip = zipfile.is_zipfile(archive)
+        if not is_7z and not is_zip:
+            logger.warning(f'Archive not supported: {archive}')
             continue
         logger.debug(f'Processing archive: {archive}')
         try:
-            with py7zr.SevenZipFile(archive, mode='r') if py7zr.is_7zfile(archive) else zipfile.ZipFile(archive, 'r') as z:
+            with py7zr.SevenZipFile(archive, mode='r') if is_7z else zipfile.ZipFile(archive, 'r') as z:
                 for filename in z.getnames() if py7zr.is_7zfile(archive) else z.namelist():
                     info = z.getinfo(filename)
-                    archive = archive.replace("\"","")
-                    filename = filename.replace("/","\\")
-                    virtualpath = f'{archive}\\{filename}'.replace("\"","")
+                    archive = replace_pathsep(archive.replace("\"",""))
+                    virtualpath = f'{archive}\\{replace_pathsep(filename)}'.replace("\"","")
                     size = info.file_size
                     modified = info.modified if py7zr.is_7zfile(archive) else datetime(*info.date_time)
                     created = info.created if py7zr.is_7zfile(archive) else modified

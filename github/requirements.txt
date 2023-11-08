@@ -1,4 +1,4 @@
-aiohttp==3.8.2
+aiohttp==3.8.5
 yarl==1.9.2
 frozenlist==1.4.0
 github

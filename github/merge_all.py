@@ -12,7 +12,8 @@ parser = argparse.ArgumentParser(description='Manage GitHub repositories.')
 parser.add_argument('--user', action='store_true', default=True)
 parser.add_argument('--orgs', action='store_true', default=True)
 parser.add_argument('--list', type=str, help='File path')
-parser.add_argument('--merge', action='store_true')
+parser.add_argument('--merge', action='store_true', help='Merge all pull requests')
+parser.add_argument('--close', action='store_true', help='Close all/unmergeable pull requests')
 parser.add_argument('--public', action='store_true')
 parser.add_argument('--private', action='store_true')
 parser.add_argument('--archive', action='store_true')
@@ -50,43 +51,46 @@ orgs = user.get_orgs()
 orgs_repos = [repo for org in orgs for repo in org.get_repos()]
 
 # Define actions
-def mergePRs(repo: Repository):
+def mergePRs(repo: Repository, close=False):
     if repo.archived:
-        logging.warning(f'The repository {repo_name()} is archived. Skipping...')
+        logging.warning(f'The repository {repo_name(repo)} is archived. Skipping...')
         return
     pulls = repo.get_pulls()
-    logging.info(f'Found {pulls.totalCount} pull requests in repo: {repo_name()}')
+    logging.info(f'Found {pulls.totalCount} pull requests in repo: {repo_name(repo)}')
     for pull in pulls:
-        if pull.mergeable:
+        if pull.mergeable and args.merge:
             pull.merge()
-            logging.info(f'Merged pull request {pull.number} in repo: {repo_name()}')
-        else:
+            logging.info(f'Merged pull request {pull.number} in repo: {repo_name(repo)}')
+        elif close:
             pull.edit(state='closed')
-            logging.info(f'Closed pull request {pull.number} in repo: {repo_name()}')
+            logging.info(f'Closed pull request {pull.number} in repo: {repo_name(repo)}')
+        if pulls.totalCount > 1:
+            mergePRs(repo, close)
+            sleep(30)
 
 def makePublic(repo: Repository):
     if not repo.private:
         repo.edit(private=False)
-        logging.info(f'Made repo {repo_name()} public')
+        logging.info(f'Made repo {repo_name(repo)} public')
 
 def makePrivate(repo: Repository):
     if repo.private:
         repo.edit(private=True)
-        logging.info(f'Made repo {repo_name()} private')
+        logging.info(f'Made repo {repo_name(repo)} private')
 
 def archiveRepo(repo: Repository):
     if not repo.archived:
         repo.edit(archived=True)
-        logging.info(f'Archived repo {repo_name()}')
+        logging.info(f'Archived repo {repo_name(repo)}')
 
 def unarchiveRepo(repo: Repository):
     if repo.archived:
         repo.edit(archived=False)
-        logging.info(f'Unarchived repo {repo_name()}')
+        logging.info(f'Unarchived repo {repo_name(repo)}')
 
 def deleteRepo(repo: Repository):
     repo.delete()
-    logging.info(f'Deleted repo {repo_name()}')
+    logging.info(f'Deleted repo {repo_name(repo)}')
 
 def repo_name(repo: Repository):
     return f"\"{repo.owner.login}/{repo.name}\""
@@ -96,11 +100,11 @@ def process_repos(repos: Repository):
     ok = 0;failed = 0
     for repo in repos:
         try:
-            logging.debug(f"Processing repository {ok+failed+1} {repo_name()}")
+            logging.debug(f"Processing repository {ok+failed+1} {repo_name(repo)}")
             if list_file:
-                list_file.writelines([f'{repo_name()}'])
-            if args.merge:
-                mergePRs(repo)
+                list_file.writelines([f'{repo_name(repo)}'])
+            if args.merge or args.close:
+                mergePRs(repo, args.close)
             if args.public:
                 makePublic(repo)
             if args.private:
@@ -112,15 +116,14 @@ def process_repos(repos: Repository):
             if args.delete:
                 deleteRepo(repo)
             ok += 1
-            sleep(5)
         except GithubException as e:
             failed += 1
-            logging.error(f'An error occurred while processing repository {repo_name()}: {e.status} {e.data}')
-            if list_file: list_file.writelines([f'{repo_name()} - {e.status} {e.data}'])
+            logging.error(f'An error occurred while processing repository {repo_name(repo)}: {e.status} {e.data}')
+            if list_file: list_file.writelines([f'{repo_name(repo)} - {e.status} {e.data}'])
         except Exception as e:
             failed += 1
-            logging.error(f'An error occurred while processing repository {repo_name()}: {e}')
-            if list_file: list_file.writelines([f'{repo_name()} - {e}'])
+            logging.error(f'An error occurred while processing repository {repo_name(repo)}: {e}')
+            if list_file: list_file.writelines([f'{repo_name(repo)} - {e}'])
         sleep(.5)
     logging.info(f'Processed {ok} / {ok+failed} repos')
     return (ok, failed)

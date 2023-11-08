@@ -18,3 +18,7 @@ answer.plite
 /bat
 /lnk
 /github/env
+/ZIPList.txt
+*.log
+*.efu
+/..bfg-report/

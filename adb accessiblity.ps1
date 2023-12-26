@@ -1,17 +1,27 @@
-function Get-Manifest {
+function Split-OnLastOccurrence {
     param (
         [Parameter(Mandatory=$true)]
-        [string]$PackagePath
+        [string]$string,
+        
+        [Parameter(Mandatory=$true)]
+        [string]$delimiter
     )
-    $PackageName = $PackagePath.Split("/")[-1]
-    & adb pull $PackagePath
-    $PackageDir = $PackageName + "_dir"
-    Expand-Archive -Path .\$PackageName -DestinationPath .\$PackageDir
-    $manifestContent = Get-Content -Path .\$PackageDir\AndroidManifest.xml
-    return $manifestContent
-    Remove-Item -Recurse -Force .\$PackageDir
-    Remove-Item -Force .\$PackageName.apk
+    
+    $splitArray = $string.Split($delimiter)
+    $firstPart = $splitArray[0..($splitArray.Length-2)] -join $delimiter
+    $lastPart = $splitArray[$splitArray.Length-1]
+    
+    return $firstPart, $lastPart
  }
+
+function WriteOutput {
+    $finalStr = ""
+    foreach ($arg in $args) {
+        $finalStr += $arg + " "
+    }
+    Write-Output $finalStr
+    # Write-Output ($args | ForEach-Object { $_ } | Join-String " ")
+}
 
 function Get-InstalledAccessibilityServices {
     $dumpSys = adb shell dumpsys
@@ -35,19 +45,26 @@ function Get-EnabledAccessibilityServices {
 # create class for installed package containing package name and apk path, make the path be an actual parsed path
 class InstalledPackage {
     [string]$PackageName
-    [System.IO.FileInfo]$PackagePath
-    [string]$PackageFileName
+    [string]$PackagePath
  
+    InstalledPackage([string]$PackageLine) {
+        $packagePathPart, $this.PackageName = Split-OnLastOccurrence -string $PackageLine -delimiter "="
+        $packagePathParts = $packagePathPart.Split(":", 2)
+        $this.PackagePath = $packagePathParts[1]
+    }
+
     InstalledPackage([string]$PackageName, [string]$PackagePath) {
         $this.PackageName = $PackageName
-        $this.PackagePath = New-Object System.IO.FileInfo($PackagePath)
-        $this.PackageFileName = $this.PackagePath.Name
+        $this.PackagePath = $packagePath
     }
     [void]Pull() {
         & adb pull $this.PackagePath
     }
     [void]Extract() {
         Expand-Archive -Path .\$this.PackageFileName -DestinationPath .\$this.PackageName
+    }
+    [string]GetFileName() {
+        return $this.PackagePath.Split("/")[-1]
     }
     [string]GetManifest() {
         $manifestContent = Get-Content -Path .\$this.PackageName\AndroidManifest.xml
@@ -62,29 +79,33 @@ class InstalledPackage {
 
 function Get-InstalledPackages {
     $installedPackages = & adb shell pm list packages -f
-    # create empty array of arrays containing each (package name, package path, package file name)
+    # create empty list of InstalledPackage
     $packages = @()
     # loop through each line
     foreach ($package in $installedPackages) {
-        # Example Line: package:/system/app/PacProcessor/PacProcessor.apk=com.android.pacprocessor
-        # split line by "="
-        $packageParts = $package.Split("=")
-        # split package path by ":"
-        $packagePathParts = $packageParts[0].Split(":")
-        # get package name
-        $packageName = $packageParts[1]
-        # get package path
+        # WriteOutput("package: ", $package)
+        $packagePathPart, $packageName = Split-OnLastOccurrence -string $package -delimiter "="
+        # WriteOutput("packageName: ", $packageName)
+        # WriteOutput("packagePathPart: ", $packagePathPart)
+        $packagePathParts = $packagePathPart.Split(":", 2)
+        # WriteOutput("packagePathParts: ", ($packagePathParts -join " ; "))
         $packagePath = $packagePathParts[1]
-        # get package file name by splitting package path by "/"
-        $packageFileName = $packagePath.Split("/")[-1]
-        # add package name, package path and package file name to packages array
-        $packages += ,@($packageName, $packagePath, $packageFileName)
+        # WriteOutput("packagePath: ", $packagePath)
+        # $packageFileName = $packagePath.Split("/")[-1]
+        # skip if package name and path are empty
+        if ($packageName -eq "" -and $packagePath -eq "") {
+            continue
+        }
+        $packages += [InstalledPackage]::new($packageName, $packagePath)
+        WriteOutput
     }
     return $packages
 }
 
 # Execute ADB commands
 $installedPackages = Get-InstalledPackages
+# $installedPackages = $installedPackages | Where-Object { $_ -ne "" }
+$installedPackages = $installedPackages | Sort-Object -Property PackageName
 Write-Output $installedPackages
 # exit script
 exit

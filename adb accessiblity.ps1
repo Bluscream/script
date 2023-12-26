@@ -46,16 +46,19 @@ function Get-EnabledAccessibilityServices {
 class InstalledPackage {
     [string]$PackageName
     [string]$PackagePath
+    [string]$PackageFileName
  
     InstalledPackage([string]$PackageLine) {
         $packagePathPart, $this.PackageName = Split-OnLastOccurrence -string $PackageLine -delimiter "="
         $packagePathParts = $packagePathPart.Split(":", 2)
         $this.PackagePath = $packagePathParts[1]
+        $this.PackageFileName = $this.GetFileName()
     }
 
     InstalledPackage([string]$PackageName, [string]$PackagePath) {
         $this.PackageName = $PackageName
         $this.PackagePath = $packagePath
+        $this.PackageFileName = $this.GetFileName()
     }
     [void]Pull() {
         & adb pull $this.PackagePath
@@ -83,21 +86,15 @@ function Get-InstalledPackages {
     $packages = @()
     # loop through each line
     foreach ($package in $installedPackages) {
-        # WriteOutput("package: ", $package)
-        $packagePathPart, $packageName = Split-OnLastOccurrence -string $package -delimiter "="
-        # WriteOutput("packageName: ", $packageName)
-        # WriteOutput("packagePathPart: ", $packagePathPart)
-        $packagePathParts = $packagePathPart.Split(":", 2)
-        # WriteOutput("packagePathParts: ", ($packagePathParts -join " ; "))
-        $packagePath = $packagePathParts[1]
-        # WriteOutput("packagePath: ", $packagePath)
-        # $packageFileName = $packagePath.Split("/")[-1]
-        # skip if package name and path are empty
-        if ($packageName -eq "" -and $packagePath -eq "") {
-            continue
+        try {
+            $installedPackage = [InstalledPackage]::new($package)
+            if ($installedPackage.PackageName -eq "" -and $installedPackage.PackagePath -eq "") {
+                throw "Failed to parse package: $package"
+            }
+            $packages += $installedPackage
+        } catch {
+            Write-Output "Failed to parse package: $package"
         }
-        $packages += [InstalledPackage]::new($packageName, $packagePath)
-        WriteOutput
     }
     return $packages
 }

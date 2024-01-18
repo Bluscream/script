@@ -22,3 +22,5 @@ answer.plite
 *.log
 *.efu
 /..bfg-report/
+/powerprofiles
+/tasks

@@ -1,5 +1,5 @@
 # Define the IP addresses to ping
-$ipAddresses = @('192.168.2.1', '192.168.2.4', '192.168.2.38', '8.8.8.8')
+$ipAddresses = @('192.168.2.1', '192.168.2.4', '192.168.2.38', '192.168.169.100', '8.8.8.8')
 
 # Continuously ping the IP addresses
 while ($true) {

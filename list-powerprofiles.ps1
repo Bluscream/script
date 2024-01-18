@@ -14,9 +14,15 @@ $powerSchemes = powercfg -list | Select-String -Pattern 'Power Scheme GUID: (.*)
 
 # For each power scheme, create a batch file to activate it
 foreach ($scheme in $powerSchemes) {
-    $batchFileName = "powerprofiles/$($scheme.Name).bat"
-    $batchContent = "powercfg -setactive $($scheme.GUID)"
-    Set-Content -Path $batchFileName -Value $batchContent
+    $batchContent = "powercfg /S $($scheme.GUID)"
+    Set-Content -Path "powerprofiles/$($scheme.Name).bat" -Value $batchContent
+    # $ps1Content = @"
+    # # Activate power scheme $($scheme.ElementName)
+    # $guid = '$($scheme.InstanceID.SubString($scheme.InstanceID.LastIndexOf("{")))'
+    # (powercfg /S $guid)
+    # "@
+    # Set-Content -Path "powerprofiles/$($scheme.Name).ps1" -Value $ps1Content
+    powercfg -export "powerprofiles/$($scheme.Name).pow" $scheme.GUID
 }
 
 Write-Host "Batch files created for each power profile."

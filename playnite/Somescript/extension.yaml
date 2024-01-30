@@ -1,0 +1,6 @@
+﻿Id: Somescript_fc148f13-9a8e-4f90-9d24-66178f0671e1
+Name: PowerShell Extension
+Author: John Doe
+Version: 1.0
+Module: PowerShellScript.psm1
+Type: Script

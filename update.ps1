@@ -1,33 +1,64 @@
 param (
-    [switch]$skipUAC = $false
+    [switch]$pip,
+    [switch]$npm,
+    [switch]$scoop,
+    [switch]$chocolatey,
+    [switch]$winget,
+    [switch]$includeUnknown,
+    [switch]$windows,
+    [switch]$all,
+    [switch]$skipUAC = $false,
+    [switch]$help
 )
 
-Function GetKeyPress([string]$regexPattern = '[ynq]', [string]$message = $null, [int]$timeOutSeconds = 0) {
-    $key = $null
-    $Host.UI.RawUI.FlushInputBuffer() 
-    if (![string]::IsNullOrEmpty($message)) {
-        Write-Host -NoNewLine $message
-    }
-    $counter = $timeOutSeconds * 1000 / 250
-    while ($null -eq $key -and ($timeOutSeconds -eq 0 -or $counter-- -gt 0)) {
-        if (($timeOutSeconds -eq 0) -or $Host.UI.RawUI.KeyAvailable) {                       
-            $key_ = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown,IncludeKeyUp")
-            if ($key_.KeyDown -and $key_.Character -match $regexPattern) {
-                $key = $key_                    
-            }
-        } else {
-            Start-Sleep -m 250
-        }
-    }                       
-    if (-not ($null -eq $key)) {
-        Write-Host -NoNewLine "$($key.Character)" 
-    }
-    if (![string]::IsNullOrEmpty($message)) {
-        Write-Host ""
-    }       
-    return $(if ($null -eq $key) { $null } else { $key.Character })
+$allByDefault = $false # Can set to true to update everything by default instead of showing help
+
+function Print-Help {
+    Write-Host @"
+Usage: ./update.ps1 [options]
+Options:
+    -pip                : Update pip
+    -npm                : Update npm
+    -scoop              : Update scoop
+    -chocolatey         : Update chocolatey
+    -winget             : Update winget
+    -includeUnknown     : Include unknown packages during winget upgrade
+    -windowsUpdate      : Update Windows
+    -all                : Update everything
+    -skipUAC            : Skip User Account Control prompt
+    -help               : Display this help message
+"@
 }
+
+function Elevate-Script {
+    if (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+        if ([int](Get-CimInstance -Class Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber) -ge 6000) {
+            $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
+            Start-Process -FilePath PowerShell.exe -Verb Runas -ArgumentList $CommandLine
+            Exit
+        }
+    }
+}
+function Set-Title {
+    param (
+        [string]$message,
+        [string]$color = 'Green'
+    )
+    $Host.UI.RawUI.WindowTitle = $message
+    Write-Host $message -ForegroundColor $color
+}
+Function pause ($message) {
+    if ($psISE) {
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show("$message")
+    } else {
+        Write-Host "$message" -ForegroundColor Yellow
+        $x = $host.ui.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    }
+}
+
 function Update-Pip {
+    Set-Title 'Updating pip'
     # Get a list of all installed packages
     $installedPackages = & pip list --format=freeze
 
@@ -41,6 +72,7 @@ function Update-Pip {
     }
 }
 function Update-Npm {
+    Set-Title 'Updating npm'
     # Get list of outdated packages
     $outdatedPackages = & npm outdated --json | ConvertFrom-Json
 
@@ -49,60 +81,70 @@ function Update-Npm {
         & npm install $($package.name)@latest
     }
 }
-
-
-if (-Not $skipUAC) {
-    if (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
-        if ([int](Get-CimInstance -Class Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber) -ge 6000) {
-            $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
-            Start-Process -FilePath PowerShell.exe -Verb Runas -ArgumentList $CommandLine
-            Exit
-        }
-    }
+function Update-Scoop {
+    Set-Title 'Updating scoop'
+    scoop install git
+    scoop update * -g
 }
-$Host.UI.RawUI.WindowTitle = 'Updating scoop'
-scoop install git
-scoop update * -g
-$Host.UI.RawUI.WindowTitle = 'Updating chocolatey'
-choco upgrade all --accept-license --yes --allowunofficial --install-if-not-installed --ignorechecksum
-$cmd = "winget upgrade --all --accept-package-agreements --accept-source-agreements"
-if ((GetKeyPress -regexPattern '[yn]' -message "Skip `"winget upgrade --all`"? (y/[n])" -timeOutSeconds 10) -ne "y") {
-    if ((GetKeyPress -regexPattern '[yn]' -message "Skip unknown package versions? (y/[n])" -timeOutSeconds 5) -ne "y") {
+function Update-Chocolatey {
+    Set-Title 'Updating chocolatey'
+    choco upgrade all --accept-license --yes --allowunofficial --install-if-not-installed --ignorechecksum
+}
+function Update-Winget {
+    Set-Title 'Updating winget'
+    $cmd = "winget upgrade --all --accept-package-agreements --accept-source-agreements"
+    if ($includeUnknown) {
         $cmd += " --include-unknown"
-    } else {
-        Write-Output "Only updating known package versions..."
     }
-    Write-Output "Running $cmd"
-    $Host.UI.RawUI.WindowTitle = 'Updating winget'
+    Write-Host $cmd
     Invoke-Expression $cmd
-} else {
-    Write-Output "Skipping winget..."
 }
-$Host.UI.RawUI.WindowTitle = 'Updating pip'
-Update-Pip
-$Host.UI.RawUI.WindowTitle = 'Updating npm'
-Update-Npm
-$Host.UI.RawUI.WindowTitle = 'Updating windows'
-Install-Module PSWindowsUpdate -force
-Import-Module PSWindowsUpdate
-Get-WindowsUpdate
-Add-WUServiceManager -MicrosoftUpdate -Confirm:$false # -ServiceID "7971f918-a847-4430-9279-4a52d1efe18d"
-Install-WindowsUpdate -MicrosoftUpdate -AcceptAll
-Function pause ($message) {
-    if ($psISE) {
-        Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.MessageBox]::Show("$message")
-    } else {
-        Write-Host "$message" -ForegroundColor Yellow
-        $x = $host.ui.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+function Update-Windows {
+    Set-Title 'Updating windows'
+    Install-Module PSWindowsUpdate -force
+    Import-Module PSWindowsUpdate
+    Get-WindowsUpdate
+    Add-WUServiceManager -MicrosoftUpdate -Confirm:$false # -ServiceID "7971f918-a847-4430-9279-4a52d1efe18d"
+    Install-WindowsUpdate -MicrosoftUpdate -AcceptAll
+}
+
+if ($allByDefault -and $MyInvocation.BoundParameters.Count -eq 0) {
+    $pip = $true
+    $npm = $true
+    $scoop = $true
+    $chocolatey = $true
+    $winget = $true
+    $windows = $true
+} else {
+    # Check if help switch is passed in
+    if ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
+        Print-Help
+        exit
     }
 }
+
+if (-Not $skipUAC) { Elevate-Script }
+
+if ($all -or $scoop) { Update-Scoop }
+
+if ($all -or $chocolatey) { Update-Chocolatey }
+
+if ($all -or $winget) { Update-Winget }
+
+if ($all -or $pip) { Update-Pip }
+
+if ($all -or $npm) { Update-Npm }
+
+if ($all -or $windows) { Update-Windows }
+
+
 pause "Press any key to exit"
+
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAQ7BVVt2jugpmh
-# LR82QbOcqudMQ/SyjvDEKnPJw9/PYqCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDNx4Bj/UxacqN6
+# c4pqDhoL8ZAW3uv0E9R4VScO/vIbHKCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
 # sEdtdKBCF5GpMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAMMEEFUQSBBdXRoZW50
 # aWNvZGUwHhcNMjMwNTIxMTQ1MjUxWhcNMjQwNTIxMTUxMjUxWjAbMRkwFwYDVQQD
 # DBBBVEEgQXV0aGVudGljb2RlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
@@ -223,29 +265,29 @@ pause "Press any key to exit"
 # X+Db2a2QgESvgBBBijGCBQUwggUBAgEBMC8wGzEZMBcGA1UEAwwQQVRBIEF1dGhl
 # bnRpY29kZQIQacE1cVrK/bBHbXSgQheRqTANBglghkgBZQMEAgEFAKCBhDAYBgor
 # BgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCAt
-# NWqI3RNjYXlG6BQSLgzQTzxF04IZOTaRFOgtsxDSuDANBgkqhkiG9w0BAQEFAASC
-# AQCXbUMvqGyx6HxgUcGIfOjK5/wEhCOZFgoUlPGf/IewDv3Okekn841wIgKqDVai
-# 4QIQ8dQ7stowdk6cSY/2YZqLBIAz1xaJ0MHg9Bh1RLxQxMBFwP8NoBmRglhG7xy4
-# 2GPEkhVbSqaT7QoSX/VIP0ipNBSlTijuGu8cq/zOtgvuTtooi/1taMcmjn59NmHY
-# SlkzAExnkoecP24Lv2Sdha1kSMy4jjqYvxV7R9Ync8ofmmd9+8lowZL31Ew0pc1J
-# GluAfmXC4ucMlEV1vtHbVaFqsFuEUe58aQb0G65Wca8P83TzPceyKF2lqAkpD99y
-# WNQWm5+sBGyoybgiWQbg2fp4oYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
+# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCBV
+# 7W1CbOXLaTZX0vgpIwuQII0oa+v8WOgVKliE6jQoVzANBgkqhkiG9w0BAQEFAASC
+# AQAaEVsE9yn7sv3uRePb0Rd+wteRIcGgsqqOYHNUPqq0rPp2FysWDWext3gV1UpH
+# CR8V0jFeqmL1oYMlWs4/K/1kQkE0S9CC05p7SecXxihqIWzmxtdAZImd49VRB+Up
+# vq0RlQ59TlBww1p1SB4b25P5lKNViFDj+6AoFIUHiFzWIF0qEmz1oCpNt51Djkwu
+# R+R/l0obIkA4tlr9x4KVj4QhYfAM+uePAicMUYSrCnTaDLVyQPtWMbBVXTKREPc9
+# 3TWBJDL/lz22cXPzID57mVK3vuRFxlwOT5TRHRyyFfvfeAcQcKMUToy3rEWcGB53
+# sRRzWNtwPAHhgm3jGOiQ2XOUoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
 # MHcwYzELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYD
 # VQQDEzJEaWdpQ2VydCBUcnVzdGVkIEc0IFJTQTQwOTYgU0hBMjU2IFRpbWVTdGFt
 # cGluZyBDQQIQBUSv85SdCDmmv9s/X+VhFjANBglghkgBZQMEAgEFAKBpMBgGCSqG
-# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDEzMDAwMjg1
-# MlowLwYJKoZIhvcNAQkEMSIEIANXFBqilssNMq+BgaLNCzZUdV1v7bcIV40ZxS8F
-# YrGLMA0GCSqGSIb3DQEBAQUABIICAJFT01r5oyCF+/d8sy2yjvl2PpwFA4O1fgIx
-# qCifWX7l+KwKBRUmxHEkqL007Piu35IWUNLofsAyHMwTaJ/OhooOso9GgT7mLI0p
-# vwhNQABgmTWWtmH43heVxlQzYPB/PjXwmssrnE7Vc73EkZjEn9g5hCLdt5qWamU3
-# ZRDZMorubQ5/HXur+oR0HUvi8ewJbePgTYwI/yAf8Uvv5Q398I/vsegbH7a1laZ0
-# mVYEisgFVz0QB6+JH7W9l5cu7I8qLGFPXqqwBIjVP3Ms76Yx1XpPQ+HeNCzDOvAl
-# nSkLJ9FiLVlBo0+v5pLb/elPHpxrw/qiJnegaCHuE4sF/HL5+xQFpDQXuIcL7gLI
-# mzcjFuyApLWklEZHuZ7MEuu8/v+F8TRgmiGdB7xjub0Aymf5WzaezXedZq02cBSf
-# 4TurXbDkXorjbC+0OdJyatfiW7bRa0pC3+/qG5HknVfXekNdUKXCSIT8tBYnzwOo
-# mOZFZb+i382+5B8CyDk4FOxHuGrN6je2ORqHbJ0YdxvB0LW4oqQO36eK8mTGTBl7
-# kC+sAjUac5qMHiiS12CqWSJGhgCqwEPHt6xFJKMQ6EJWe3KbkPZ2hdlE0C9UBkcT
-# 1RJwkbAWnCeeGV2uV0+Rb193OCxScvWzLPKI1FjrbjoNDcg/5PBJQLPt1Op2yj9y
-# VfLL/hMB
+# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDEzMDAxMDYz
+# MVowLwYJKoZIhvcNAQkEMSIEIGKhC0c8Thh58rIPsTn8fWOQAofT0e2wGP5olZVO
+# 4my+MA0GCSqGSIb3DQEBAQUABIICACNWy1pqIQNrDvuu/BPJBinAxvMJ1KWGYR14
+# IQSKVuZrn8b6Ih4z5JUUoGLmLqmJpZaqW8cGtxs2RBZa3Jj7Gahfqe+HIcv5cSPB
+# vBmI6zF9XiZpTajGTBvDiiytnReR3t0klv/JCUVY2j3TELMahH9OiATierKkZE/1
+# Wslp8gM09xK6US5zSdISCkhKM+A5LiT/hJOeRR2v/3txceU/3CfTBaCFC9KCk/qs
+# tPw24PSoVkFDIohs6C+KBZPsHg6xQhSWPrnvtNtPSHD5/TtLeix64tYWI6Fu+r6e
+# 1Dgno93PRtOZwhDQ9P9jGEWSYsbrRbwe2OQzWrhhYLiTX+ILQOZkNUEYpWjKNtz6
+# IrbJCRhLs+4mtalg4/2MNimf3qXiu3C/pT8Z5ruG7B2XXtohVZiaB/iu0aVB7x3Z
+# /QjgsYQbQRgq05rDL5WZP00/mVrRfYWHu3GwMMR1BJZdP0/j/ECi+u+qFAO9Z8Bg
+# dpnbYPUVTlrc/1j2LybcR8hYAGrVx6ImeZi+bEq2GEUR2KrJVVnZO2hjpCVxZOr2
+# BKm3HtEz7R3AThajY2D+JsiDThEZ5m8u0s86buXjVCuqup+5XGby6nbt36G6V1sk
+# OPqqhLwOlVLaVqErAM+3SVvGIYOZiaArPkTopr0dVfSqGuRsEchDA57pyUMXmhI8
+# coyOwGn3
 # SIG # End signature block

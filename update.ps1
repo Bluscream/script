@@ -7,6 +7,7 @@ param (
     [switch]$includeUnknown,
     [switch]$windows,
     [switch]$all,
+    [switch]$default,
     [switch]$skipUAC = $false,
     [switch]$help
 )
@@ -25,6 +26,7 @@ Options:
     -includeUnknown     : Include unknown packages during winget upgrade
     -windowsUpdate      : Update Windows
     -all                : Update everything
+    -default            : Update (scoop, chocolatey, winget, windows)
     -skipUAC            : Skip User Account Control prompt
     -help               : Display this help message
 "@
@@ -93,7 +95,7 @@ function Update-Chocolatey {
 function Update-Winget {
     Set-Title 'Updating winget'
     $cmd = "winget upgrade --all --accept-package-agreements --accept-source-agreements"
-    if ($includeUnknown) {
+    if ($all -or $includeUnknown) {
         $cmd += " --include-unknown"
     }
     Write-Host $cmd
@@ -125,17 +127,17 @@ if ($allByDefault -and $MyInvocation.BoundParameters.Count -eq 0) {
 
 if (-Not $skipUAC) { Elevate-Script }
 
-if ($all -or $scoop) { Update-Scoop }
+if ($all -or $default -or $scoop) { Update-Scoop }
 
-if ($all -or $chocolatey) { Update-Chocolatey }
+if ($all -or $default -or $chocolatey) { Update-Chocolatey }
 
-if ($all -or $winget) { Update-Winget }
+if ($all -or $default -or $winget) { Update-Winget }
 
 if ($all -or $pip) { Update-Pip }
 
 if ($all -or $npm) { Update-Npm }
 
-if ($all -or $windows) { Update-Windows }
+if ($all -or $default -or $windows) { Update-Windows }
 
 
 pause "Press any key to exit"

@@ -117,12 +117,9 @@ if ($allByDefault -and $MyInvocation.BoundParameters.Count -eq 0) {
     $chocolatey = $true
     $winget = $true
     $windows = $true
-} else {
-    # Check if help switch is passed in
-    if ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
-        Print-Help
-        exit
-    }
+} elseif ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
+    Print-Help
+    exit
 }
 
 if (-Not $skipUAC) { Elevate-Script }
@@ -133,12 +130,11 @@ if ($all -or $default -or $chocolatey) { Update-Chocolatey }
 
 if ($all -or $default -or $winget) { Update-Winget }
 
-if ($all -or $pip) { Update-Pip }
+if ($all -or $default -or $windows) { Update-Windows }
 
 if ($all -or $npm) { Update-Npm }
 
-if ($all -or $default -or $windows) { Update-Windows }
-
+if ($all -or $pip) { Update-Pip }
 
 pause "Press any key to exit"
 

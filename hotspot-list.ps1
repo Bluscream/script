@@ -40,7 +40,7 @@ if (-not (Test-Path -Path $outputDirectory)) {
 }
 
 # Run the wmic command and parse the output
-$wmicOutput = wmic nicconfig get description,settingid /format:csv
+$wmicOutput = wmic nicconfig get description,settingid,macaddress /format:csv
 $parsedOutput = ConvertFrom-Csv -InputObject $wmicOutput
 
 # Iterate over each network adapter configuration
@@ -69,6 +69,7 @@ Windows Registry Editor Version   5.00
 "PreferredPublicInterface"=hex:$byteString
 "PreferredPublicInterfaceName"="$($adapter.Description)"
 "PreferredPublicInterfaceID"="$($adapter.SettingID)"
+"PreferredPublicInterfaceMAC"="$($adapter.MACAddress)"
 "@
     Write-Host $regContent
     # Write the registry content to the .reg file

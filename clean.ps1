@@ -1,50 +1,24 @@
 param (
     [switch]$pip,
     [switch]$npm,
-    [switch]$scoop,
-    [switch]$chocolatey,
-    [switch]$winget,
-    [switch]$includeUnknown,
-    [switch]$windows,
     [switch]$all,
     [switch]$default,
     [switch]$skipUAC = $false,
-    [switch]$help,
-    [ValidateSet('Lock', 'Shutdown', 'Reboot', 'Hibernate', 'SetPowerProfile')]
-    [string]$CompleteAction,
-    [int]$Delay =  0
+    [switch]$help
 )
 
 $allByDefault = $false # Can set to true to update everything by default instead of showing help
 
-function Print-Help { Write-Host @"
+function Print-Help {
+    Write-Host @"
 Usage: ./update.ps1 [options]
 Options:
-    -pip                : Update pip
-    -npm                : Update npm
-    -scoop              : Update scoop
-    -chocolatey         : Update chocolatey
-    -winget             : Update winget
-    -includeUnknown     : Include unknown packages during winget upgrade
-    -windowsUpdate      : Update Windows
-    -all                : Update everything
-    -default            : Update (scoop, chocolatey, winget, windows)
+    -pip                : Uninstall all unimportant pip packages
+    -npm                : Uninstall all unimportant npm packages
+    -all                : Uninstall all unimportant packages
+    -default            : Uninstall all unimportant (pip, npm) packages
     -skipUAC            : Skip User Account Control prompt
-    -CompleteAction     : Perform a complete action after updating (Lock, Shutdown, Reboot, Hibernate, SetPowerProfile=<PowerProfileID>)
-    -Delay              : Delay before performing the complete action
     -help               : Display this help message
-
-Examples:
-    ./update.ps1 -all
-    [ Will update everything ]
-    ./update.ps1 -pip -npm
-    [ Will update pip and npm ]
-    ./update.ps1 -scoop -chocolatey -winget -windowsUpdate
-    [ Will update scoop, chocolatey, winget and windows ]
-    ./update.ps1 -CompleteAction SetPowerProfile=8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c -Delay 60
-    [ Will set the power profile to High Performance after updating and wait for 60 seconds ]
-    ./update.ps1 -help
-    [ Will display this help message ]
 "@
 }
 
@@ -69,182 +43,95 @@ Function pause ($message) {
     if ($psISE) {
         Add-Type -AssemblyName System.Windows.Forms
         [System.Windows.Forms.MessageBox]::Show("$message")
-    }
-    else {
+    } else {
         Write-Host "$message" -ForegroundColor Yellow
         $x = $host.ui.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     }
 }
-function Execute-CompleteAction {
-    param (
-        [string]$action
-    )
 
-    switch ($action) {
-        'Lock' {
-            rundll32.exe user32.dll,LockWorkStation
-            return $true
-        }
-        'Shutdown' {
-            shutdown.exe /s /t  0
-            return $true
-        }
-        'Reboot' {
-            shutdown.exe /r /t  0
-            return $true
-        }
-        'Hibernate' {
-            rundll32.exe powrprof.dll,SetSuspendState  0,1,0
-            return $true
-        }
+function Backup-Pip {
+    Set-Title "Backing up pip packages"
+    # Get a list of all installed pip packages with their versions
+    $pipList = pip list --format=freeze
+
+    # Specify the backup file path
+    $backupFilePath = "requirements.txt"
+
+    # Create the backup file
+    $pipList | Out-File -FilePath $backupFilePath -Encoding utf8
+
+    Write-Host "Pip packages have been backed up to $backupFilePath"
+}
+function Clear-Pip {
+    # List of essential pip packages that should not be uninstalled
+    $essentialPackages = "wheel", "setuptools", "pip"
+
+    Set-Title "Clearing pip packages except ($essentialPackages)"
+
+    # Get a list of all installed pip packages
+    $allPackages = pip list --format=freeze | ForEach-Object { $_.Split('==')[0] }
+
+    # Filter out the essential packages
+    $unimportantPackages = $allPackages | Where-Object { $_ -notin $essentialPackages }
+
+    # Uninstall the unimportant packages
+    foreach ($package in $unimportantPackages) {
+        pip uninstall -y $package
     }
-    # if action starts with SetPowerProfile=, then set the power profile
-    if ($action -match '^SetPowerProfile=(.*)') {
-        $powerProfile = $matches[1]
-        powercfg.exe /s $powerProfile
-        return $true
-    }
-    return $false
 }
 
-function Update-Pip {
-    try {
-        Set-Title 'Updating pip'
-        # Get a list of all installed packages
-        $installedPackages = & pip list --format=freeze
-    
-        # Iterate over each package and upgrade it
-        foreach ($package in $installedPackages) {
-            # Extract the package name from the line
-            $packageName = $package.Split("==")[0]
-    
-            # Upgrade the package
-            & pip install --upgrade $packageName
-        }
-        return $true
-    }
-    catch {
-        Write-Error $_.Exception.Message
-        return $false
-    }
-}
-function Update-Npm {
-    try {
-        Set-Title 'Updating npm'
-        # Get list of outdated packages
-        $outdatedPackages = & npm outdated --json | ConvertFrom-Json
+function Backup-Npm {
+    Set-Title "Backing up npm packages"
+    # Get a list of all installed npm packages with their versions
+    $npmList = npm list --global --json | ConvertFrom-Json | ForEach-Object { $_.dependencies } | ForEach-Object { $_.PSObject.Properties } | ForEach-Object { "$($_.Name)@$($_.Value.version)" }
 
-        foreach ($package in $outdatedPackages.data) {
-            # Update each package individually
-            & npm install $($package.name)@latest
-        }
-        return $true
-    }
-    catch {
-        Write-Error $_.Exception.Message
-        return $false
-    }
+    # Specify the backup file path
+    $backupFilePath = "packages.json"
+
+    # Convert the package list to JSON format
+    $npmListJson = $npmList | ConvertTo-Json
+
+    # Create the backup file
+    $npmListJson | Out-File -FilePath $backupFilePath -Encoding utf8
+
+    Write-Host "Npm packages have been backed up to $backupFilePath"
 }
-function Update-Scoop {
-    try {
-        Set-Title 'Updating scoop'
-        scoop install git
-        scoop update * -g
-        return $true
-    }
-    catch {
-        Write-Error $_.Exception.Message
-        return $false
-    }
-}
-function Update-Chocolatey {
-    try {
-        Set-Title 'Updating chocolatey'
-        choco upgrade all --accept-license --yes --allowunofficial --install-if-not-installed --ignorechecksum
-        return $true
-    }
-    catch {
-        Write-Error $_.Exception.Message
-        return $false
-    }
-}
-function Update-Winget {
-    try {
-        Set-Title 'Updating winget'
-        $cmd = "winget upgrade --all --accept-package-agreements --accept-source-agreements"
-        if ($all -or $includeUnknown) {
-            $cmd += " --include-unknown"
-        }
-        Write-Host $cmd
-        Invoke-Expression $cmd
-        return $true
-    }
-    catch {
-        Write-Error $_.Exception.Message
-        return $false
-    }
-}
-function Update-Windows {
-    try {
-        Set-Title 'Updating windows'
-        Install-Module PSWindowsUpdate -force
-        Import-Module PSWindowsUpdate
-        # Get-WindowsUpdate
-        Add-WUServiceManager -MicrosoftUpdate -Confirm:$false # -ServiceID "7971f918-a847-4430-9279-4a52d1efe18d"
-        # Add-WUServiceManager -WindowsUpdate -Confirm:$false # -ServiceID "9482f4b4-e343-43b6-b170-9a65bc822c77"
-        Add-WUServiceManager -ServiceID "9482f4b4-e343-43b6-b170-9a65bc822c77" -Confirm:$false
-        Get-WindowsUpdate -Install -MicrosoftUpdate -AcceptAll -IgnoreReboot
-        return $true
-    }
-    catch {
-        Write-Error $_.Exception.Message
-        return $false
+function Clear-Npm {
+    # List of essential npm packages that should not be uninstalled
+    $essentialPackages = "npm"
+
+    Set-Title "Clearing npm packages except ($essentialPackages)"
+
+    # Get a list of all installed npm packages
+    $allPackages = npm list --depth=0 --global --json | ConvertFrom-Json | ForEach-Object { $_.dependencies | Get-Member -MemberType NoteProperty | ForEach-Object { $_.Name } }
+
+    # Filter out the essential packages
+    $unimportantPackages = $allPackages | Where-Object { $_ -notin $essentialPackages }
+
+    # Uninstall the unimportant packages
+    foreach ($package in $unimportantPackages) {
+        npm uninstall -g $package
     }
 }
 
 if ($allByDefault -and $MyInvocation.BoundParameters.Count -eq 0) {
     $pip = $true
     $npm = $true
-    $scoop = $true
-    $chocolatey = $true
-    $winget = $true
-    $windows = $true
-}
-elseif ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
+} elseif ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
     Print-Help
     exit
 }
 
 if (-Not $skipUAC) { Elevate-Script }
 
-if ($all -or $default -or $scoop) { $scoop_success = Update-Scoop }
+if ($all -or $default -or $npm) {
+    Backup-Npm
+    Clear-Npm
+}
 
-if ($all -or $default -or $chocolatey) { $chocolatey_success = Update-Chocolatey }
-
-if ($all -or $default -or $winget) { $winget_success = Update-Winget }
-
-if ($all -or $default -or $windows) { $windows_success = Update-Windows }
-
-if ($all -or $npm) { $npm_success = Update-Npm }
-
-if ($all -or $pip) { $pip_success = Update-Pip }
-
-if (!$scoop_success) { Write-Host "Failed to update scoop" -ForegroundColor Red }
-if (!$chocolatey_success) { Write-Host "Failed to update chocolatey" -ForegroundColor Red }
-if (!$winget_success) { Write-Host "Failed to update winget" -ForegroundColor Red }
-if (!$windows_success) { Write-Host "Failed to update windows" -ForegroundColor Red }
-if (!$npm_success) { Write-Host "Failed to update npm" -ForegroundColor Red }
-if (!$pip_success) { Write-Host "Failed to update pip" -ForegroundColor Red }
-
-if ($CompleteAction) {
-    Set-Title "Complete action: $CompleteAction (Delay: $Delay s)"
-    if ($Delay -gt 0) {
-        Write-Host "Waiting for $Delay seconds before performing the complete action"
-        Start-Sleep -Seconds $Delay
-    }
-    $completeActionSuccess = Execute-CompleteAction -action $CompleteAction
-    if ($completeActionSuccess) { Write-Host "Complete action performed successfully" -ForegroundColor Green
-    } else { Write-Host "Failed to perform complete action" -ForegroundColor Red }
+if ($all -or $default -or $pip) {
+    Backup-Pip
+    Clear-Pip
 }
 
 pause "Press any key to exit"
@@ -252,8 +139,8 @@ pause "Press any key to exit"
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAa2Ry6Z+OxSS8P
-# QSX8rGo7TpO2q15bV+z6PKRK41GGRqCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCC7Zmzw7VwVWxWb
+# zt37jIE0WD06QEesNP7r8B5qtbRj7aCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
 # sEdtdKBCF5GpMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAMMEEFUQSBBdXRoZW50
 # aWNvZGUwHhcNMjMwNTIxMTQ1MjUxWhcNMjQwNTIxMTUxMjUxWjAbMRkwFwYDVQQD
 # DBBBVEEgQXV0aGVudGljb2RlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
@@ -374,29 +261,29 @@ pause "Press any key to exit"
 # X+Db2a2QgESvgBBBijGCBQUwggUBAgEBMC8wGzEZMBcGA1UEAwwQQVRBIEF1dGhl
 # bnRpY29kZQIQacE1cVrK/bBHbXSgQheRqTANBglghkgBZQMEAgEFAKCBhDAYBgor
 # BgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCC5
-# NC2ZpJQvkEZwb/I04/BnM+q8SaijHH73Cw8myiOfpDANBgkqhkiG9w0BAQEFAASC
-# AQB+VKlHbuLn59Fw+0acLpzInanUdm591NMpKyWwarwz7wwMe/i22Rkk/AH1X70j
-# FKFPQDjYqaHAdI1JT3kgpebU/wmH6WrpJ0vD39bsKHSuIAqK4LLlIjGE6AU/8bf+
-# yUHubGi+bvbl0WY1rFHi2S5mDO0pZGrqbaOGWfuD6hor9WSH6l0y7B6f96cIFdD4
-# CkNZJqLGeaG/ZSHuvnaHrFF65X0SkjWczVBHAXGuhcmxVJynOoNuTkpEAYLzj6AW
-# hDnrb1cQqIqG//scUH/yNHvWNEED6kbXeyp9sUUXxR5lUoPbIv/z2cl9f88lFd4b
-# feQcIXNlGRWo+K2F9wst3YyUoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
+# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCBQ
+# onsdCuHrvPK+Ok5IZn/chZXEeS7uKRnAbnR2Z4QBmDANBgkqhkiG9w0BAQEFAASC
+# AQBW8qvvndrP8CKS5gZrAs0q3t8Wyi3pwpH1uMdOfXqGEMp0udOUoqiBXTNiYWoA
+# W0Uv141aZ49FuBMuJMIeu0EHpVl95I1tSanaLubd6j9ug9ZrKZ/i/SwW05bYNV4I
+# YHzi5MCk8K79R1m2JJ9polxjjv0gppQE1MpyxmUG8bcgRdq3Zu9XwqYPJIwuX3ps
+# r0tnQ8ecOcysFOZy5i6bM4OyZEa1u8Ag+j22BBWqMD3mlQwVPkHgVPS65TxMllGe
+# ERauy8s7N9lRRkZLQEjexEkILnWcpK8XtWKu6y8h8JUt/YudhWOlGP4WncQ9Mzrf
+# sp3oziTMgo2fEuVQI+8SHZOpoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
 # MHcwYzELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYD
 # VQQDEzJEaWdpQ2VydCBUcnVzdGVkIEc0IFJTQTQwOTYgU0hBMjU2IFRpbWVTdGFt
 # cGluZyBDQQIQBUSv85SdCDmmv9s/X+VhFjANBglghkgBZQMEAgEFAKBpMBgGCSqG
-# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDIxOTEyMzA0
-# N1owLwYJKoZIhvcNAQkEMSIEIKyW6ZidbFdKVSpDP4QNFC5izgdJk1FK1ksIlnyW
-# 3j9uMA0GCSqGSIb3DQEBAQUABIICABgKcztjTwNtiWo2kYTs8GOoJNe0A65zNWnj
-# t0/+HsOnAmNpqmoOq3l2CC4/8b88xEzj/JYqobQoBHEJAwz6rpmfmDdIUKqDIjGe
-# v/yDuFFrnT9tCEGpS/u4zzIip+5sYIm6C632aBiSWBSxLluaq0sMyN61+cUMrh5y
-# 2S2Sfa068EeAWvvTGxjLewEMWa1F+5oAjO6UUbHpz8kd+sbLQ7HVJxKwMbTAxwem
-# lzIwx0qqP0L05/rl6fwF72ZEGlZKKQGwqCaAjN9lB1gV8SyU9plxNd2lYJizYTAq
-# G+qHSXKTVlNTUmGcnFkESYvx6XK1keivZ02myu4JmJ7AYgus9yLDFJM/GW5Ug/QK
-# NkUdcO/XxVzoFs4TAIoIDGMslJMCouNXftivZCDuxQ7Zy2ZPLa2oxPbvXYHfFSAS
-# YF2O0UftRwP5fSpgEIaa7hD6ikO/j8Z3vs1ebhUkH1Huz/16YvtXfMguR5fNopnP
-# 3excR0Y6j3Xbu/Irdbiq2HZVLX8jKZWXeDyttg5KGLXZhrhDXKquRXQnjYCshM/t
-# 7xJ8nMPkGbjxjJJ5eajkaLgYU4Yr7Ledndc3xpIJUtqTncPpHh5vnEbHPZ2WGhsB
-# 7VC6zLVbxz6gBo0W54gobFw/SjDP+7p9Lttm3ARLhnWWVZa5CpJdU5bDd4r6iZ3/
-# L77FoaFF
+# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDIxOTEyMTYx
+# NlowLwYJKoZIhvcNAQkEMSIEIBsRzcJZ+Q2X522148SL5CLjuKKVWuOpUZhzAmW7
+# Sg34MA0GCSqGSIb3DQEBAQUABIICABZTVuxFtyLFDSQfHSVU0EJPgpVtYkh0WJQV
+# b/QawIxuV+u77hDso1n/93w6Puil2OPUBse3xPHF+Km2Fb6GwIMxN1nfb48481ki
+# VxbJQPjkGJAiacZxPadJSS0y/wpxvr8XxSCfac9Y8/GF2aiRkmraXWhlc5TX1Gqy
+# fxju6hCXA4Qrp7XoXYtuhdxasR+8n06zyL7zIXAkvWBF5qwDRrbQLC2T/cJZnsl3
+# kRljdK4Ftlpr55ZUWlNNcWCLr/j56HKbMPHiCSAcBKh4yAWHtFLcqqMx82YcOcjk
+# +h1lixhWzbk77jxUKMrohkVZW5/SPRl7ArQrBHaI1ORqTazPxZtP1wMveV1tm2x2
+# dXuz2sa+JOT1tbSR9yvhVngUZ8jAuJdnO4rxA8GKqfmwYMOpsUUuqt4DfCC6f+4Q
+# YBcILQa+jbXTPEvptOfZyQU0vwd6Epbo9ncqpSMAUA+9ewbYSf+FRY+SHC+TixYf
+# KsMa4+vLjUqTtdbQQyICddNZM9LtNv066c7bWo4mQSNLAyUStY2Xel9HAx3dj/z2
+# AV0mWzJ3RSHttKdZy8FJqet8VroMYRQEv33rIs+0viAjxZ3SJbiDgGZ7aFVZmfcV
+# phV6wNe2+1kR0UB8Y1MUXQ2Hcuiy+3g/+PpxwmLO8t1iqAGI6EqvahSCrdjsaWKf
+# /7LbH5BO
 # SIG # End signature block

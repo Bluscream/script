@@ -43,7 +43,8 @@ Function pause ($message) {
     if ($psISE) {
         Add-Type -AssemblyName System.Windows.Forms
         [System.Windows.Forms.MessageBox]::Show("$message")
-    } else {
+    }
+    else {
         Write-Host "$message" -ForegroundColor Yellow
         $x = $host.ui.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     }
@@ -82,20 +83,34 @@ function Clear-Pip {
 
 function Backup-Npm {
     Set-Title "Backing up npm packages"
+    # Check if the npm directory exists
+    $npmDir = "$env:APPDATA\npm"
+    if (-not (Test-Path $npmDir)) {
+        Write-Error "Npm directory not found: $npmDir"
+        return
+    }
+    
     # Get a list of all installed npm packages with their versions
-    $npmList = npm list --global --json | ConvertFrom-Json | ForEach-Object { $_.dependencies } | ForEach-Object { $_.PSObject.Properties } | ForEach-Object { "$($_.Name)@$($_.Value.version)" }
-
+    $npmList = npm list --global --json | ConvertFrom-Json
+    
+    # Check if the npmList object has a dependencies property
+    if ($null -eq $npmList.dependencies) {
+        Write-Error "No dependencies found in npm list output"
+        return
+    }
+    
+    # Convert the package list to JSON format
+    $npmListJson = $npmList.dependencies | ConvertTo-Json
+    
     # Specify the backup file path
     $backupFilePath = "packages.json"
-
-    # Convert the package list to JSON format
-    $npmListJson = $npmList | ConvertTo-Json
-
+    
     # Create the backup file
     $npmListJson | Out-File -FilePath $backupFilePath -Encoding utf8
-
+    
     Write-Host "Npm packages have been backed up to $backupFilePath"
 }
+    
 function Clear-Npm {
     # List of essential npm packages that should not be uninstalled
     $essentialPackages = "npm"
@@ -117,7 +132,8 @@ function Clear-Npm {
 if ($allByDefault -and $MyInvocation.BoundParameters.Count -eq 0) {
     $pip = $true
     $npm = $true
-} elseif ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
+}
+elseif ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
     Print-Help
     exit
 }
@@ -139,8 +155,8 @@ pause "Press any key to exit"
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCC7Zmzw7VwVWxWb
-# zt37jIE0WD06QEesNP7r8B5qtbRj7aCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAS+EvDMu9K8K17
+# 9mJIArMPy9uwiur5CSAan1QshANYfKCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
 # sEdtdKBCF5GpMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAMMEEFUQSBBdXRoZW50
 # aWNvZGUwHhcNMjMwNTIxMTQ1MjUxWhcNMjQwNTIxMTUxMjUxWjAbMRkwFwYDVQQD
 # DBBBVEEgQXV0aGVudGljb2RlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
@@ -261,29 +277,29 @@ pause "Press any key to exit"
 # X+Db2a2QgESvgBBBijGCBQUwggUBAgEBMC8wGzEZMBcGA1UEAwwQQVRBIEF1dGhl
 # bnRpY29kZQIQacE1cVrK/bBHbXSgQheRqTANBglghkgBZQMEAgEFAKCBhDAYBgor
 # BgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCBQ
-# onsdCuHrvPK+Ok5IZn/chZXEeS7uKRnAbnR2Z4QBmDANBgkqhkiG9w0BAQEFAASC
-# AQBW8qvvndrP8CKS5gZrAs0q3t8Wyi3pwpH1uMdOfXqGEMp0udOUoqiBXTNiYWoA
-# W0Uv141aZ49FuBMuJMIeu0EHpVl95I1tSanaLubd6j9ug9ZrKZ/i/SwW05bYNV4I
-# YHzi5MCk8K79R1m2JJ9polxjjv0gppQE1MpyxmUG8bcgRdq3Zu9XwqYPJIwuX3ps
-# r0tnQ8ecOcysFOZy5i6bM4OyZEa1u8Ag+j22BBWqMD3mlQwVPkHgVPS65TxMllGe
-# ERauy8s7N9lRRkZLQEjexEkILnWcpK8XtWKu6y8h8JUt/YudhWOlGP4WncQ9Mzrf
-# sp3oziTMgo2fEuVQI+8SHZOpoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
+# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCAQ
+# tWD+VE0K85o09n6+Pftr2RB1yieOrzgiK1RxcpCu4jANBgkqhkiG9w0BAQEFAASC
+# AQCVWdqesg2JktvbdnI3/buJbVmiokK+hS8m6bVO/gLJDqbxz4VyA2nwDO0ZG0Fa
+# GuzdnVb5idvdgYvR/ncjzLdCMF/ALMY1KjgGiirq3ur6o6j8z68XzunVxqKy1f03
+# ywcN6uns/tyGtF4dXaPGd0J6Of/YUNJ98t9CehgXaDF89+ZlX87mvwsfgS1eLikw
+# YFAVKZH+4U1huJLvvD5a9VchiYC26JlmLJlFP6IlZdQrbSIUL2Hj7xsUSklCYgm7
+# xKIn4izSoye7gueuEqJ9gCRO+Z71TEJrUFh6e+farBXVz8SKW0/acU5VYUWIbOyT
+# tb+UJWfNAS99XAztuQjRp0oeoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
 # MHcwYzELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYD
 # VQQDEzJEaWdpQ2VydCBUcnVzdGVkIEc0IFJTQTQwOTYgU0hBMjU2IFRpbWVTdGFt
 # cGluZyBDQQIQBUSv85SdCDmmv9s/X+VhFjANBglghkgBZQMEAgEFAKBpMBgGCSqG
-# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDIxOTEyMTYx
-# NlowLwYJKoZIhvcNAQkEMSIEIBsRzcJZ+Q2X522148SL5CLjuKKVWuOpUZhzAmW7
-# Sg34MA0GCSqGSIb3DQEBAQUABIICABZTVuxFtyLFDSQfHSVU0EJPgpVtYkh0WJQV
-# b/QawIxuV+u77hDso1n/93w6Puil2OPUBse3xPHF+Km2Fb6GwIMxN1nfb48481ki
-# VxbJQPjkGJAiacZxPadJSS0y/wpxvr8XxSCfac9Y8/GF2aiRkmraXWhlc5TX1Gqy
-# fxju6hCXA4Qrp7XoXYtuhdxasR+8n06zyL7zIXAkvWBF5qwDRrbQLC2T/cJZnsl3
-# kRljdK4Ftlpr55ZUWlNNcWCLr/j56HKbMPHiCSAcBKh4yAWHtFLcqqMx82YcOcjk
-# +h1lixhWzbk77jxUKMrohkVZW5/SPRl7ArQrBHaI1ORqTazPxZtP1wMveV1tm2x2
-# dXuz2sa+JOT1tbSR9yvhVngUZ8jAuJdnO4rxA8GKqfmwYMOpsUUuqt4DfCC6f+4Q
-# YBcILQa+jbXTPEvptOfZyQU0vwd6Epbo9ncqpSMAUA+9ewbYSf+FRY+SHC+TixYf
-# KsMa4+vLjUqTtdbQQyICddNZM9LtNv066c7bWo4mQSNLAyUStY2Xel9HAx3dj/z2
-# AV0mWzJ3RSHttKdZy8FJqet8VroMYRQEv33rIs+0viAjxZ3SJbiDgGZ7aFVZmfcV
-# phV6wNe2+1kR0UB8Y1MUXQ2Hcuiy+3g/+PpxwmLO8t1iqAGI6EqvahSCrdjsaWKf
-# /7LbH5BO
+# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDIxOTEyMzUw
+# MVowLwYJKoZIhvcNAQkEMSIEIDvRIFBpXfEtBCVCoC0y4udrFAPsMsi8c1XcDzQz
+# nEArMA0GCSqGSIb3DQEBAQUABIICAEdH3mXstA4oKCDsg1JNzdQqiYw99/3iTECO
+# NrgCaxTsDr0Uh4NYKrm931Ahd7QaJamC5yQCHUsuiGmv9hYUtXll/bg/CyoQ+8qm
+# kVnPNQjfHDpaWcQTSf57qfx4bzvLYfmeklLsP1OzljfYX/GDwmQg7WQq2jYveBLK
+# UflIMkPg+RVkhdaRmIZZV8OExbNAUUISFjsNvxrBbqThc4eE02nT1N/WodMuLVyO
+# nrcy7j9ntWbUCJM88GZimAhaMlLHnwMjfLTeY39EA7t/Jm690TbYJilNJ2svmRI+
+# vYS9Z+ToMS1UNGbZgDanLpCfv3jEu308Kibycy/y290/CAFbHtBxARRYRyVOYCV2
+# XcBB+NuUx9VXTcDyhUd/sdtFJFkbc4mxmegJkPCtbYOlbY1WYiXyrWEPLBoqqaUz
+# SxLgKteES8QqBIbFPThnRj1fLrqdSe9c3tWVvxl4coLHtqsVqn+iQcmxG5aeYcWd
+# hGMfIGR40w1fhzXV9Thrz/Iw3ynFMfpasLXYcDru4n3Z4YIIajXUmbk28/ix/TZh
+# N2BVVLfELL1QG04qNTc9i7/G21RWhEdI8gS7EQdQGHdJ37LlanNWCr40FlqBFGbK
+# lQJP6X3Cz9a0GdsPsaCwnx9jjAmcLvnt+0iIwltCZX4Eho5KQJId4fnOpAbjD3Yp
+# O6HHNICQ
 # SIG # End signature block

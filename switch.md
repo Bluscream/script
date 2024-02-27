@@ -33,13 +33,13 @@ The script is designed to work with a game executable, typically named `iw4x.exe
 To use the script, you can call it from the command line and provide any of the above command-line arguments. For example, to switch to a specific version of the game, you could use:
 
 ```powershell
-.\GameVersionSwitcher.ps1 -version "r4432"
+.\switch.ps1 -version "version1"
 ```
 
 To start the game after switching versions, you could use:
 
 ```powershell
-.\GameVersionSwitcher.ps1 -version "r4432" -startGame
+.\switch.exe -version "version2" -killgame -startGame
 ```
 
 ## Defining Versions

@@ -53,7 +53,7 @@ console_handler.setFormatter(formatter)
 # endregion logging
 
 def es(cmd: list[str]):
-    cmd = ['es'] + cmd + (['-instance', '1.5a'] if use_everything_1_5_alpha else [])
+    cmd = ['C:\Program Files\Everything 1.5a\es.exe'] + cmd + (['-instance', '1.5a'] if use_everything_1_5_alpha else [])
     logger.debug(f'Running command: {" ".join(cmd)}')
     subprocess.run(cmd)
 

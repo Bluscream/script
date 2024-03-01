@@ -21,6 +21,8 @@ Write-Host "Script: ""$scriptPath"" $argStr $args"
 
 $folderPaths = $args
 
+Write-Output "Compressing $(($folderPaths | Measure-Object).Count) folders"
+
 foreach ($folderPath in $folderPaths) {
     if ($folderPath -match "^file:///") {
         $uri = New-Object System.Uri($folderPath)
@@ -33,6 +35,5 @@ foreach ($folderPath in $folderPaths) {
     Write-Output "Compressed $folderPath into $zipPath"
 }
 
-Write-Output "Press any key to finish..."
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Output "Done compressing $(($folderPaths | Measure-Object).Count) folders"
 Start-Sleep -Seconds 5

@@ -6,9 +6,14 @@ $accessToken = $env:HASS_TOKEN
 $service = "notify"
 $target = "all_devices" # Replace with your notify service entity
 
+$title = $args[1]
+$message = $args[0];
+$username = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+$message = "$username > $message"
+
 $jsonPayload = @{
-  "title" = $args[1]
-  "message" = $args[0]
+  "title" = $title
+  "message" = $message
 } | ConvertTo-Json
 
 $headers = @{

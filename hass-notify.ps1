@@ -24,6 +24,10 @@ $headers = @{
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true} ;
 $response = Invoke-RestMethod -Uri "$homeAssistantUrl/api/services/$service/$target" -Method Post -Headers $headers -Body $jsonPayload
 Write-Output $response
+if ($null -eq $response -or $response.StatusCode -ne 200) {
+    $host.SetShouldExit(1)
+}
+$host.SetShouldExit(0)
 
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor

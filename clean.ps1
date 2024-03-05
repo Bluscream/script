@@ -2,6 +2,7 @@ param (
     [switch]$pip,
     [switch]$npm,
     [switch]$windows,
+    [switch]$eventlogs,
     [switch]$all,
     [switch]$default,
     [switch]$skipUAC = $false,
@@ -16,6 +17,8 @@ Usage: ./update.ps1 [options]
 Options:
     -pip                : Uninstall all unimportant pip packages
     -npm                : Uninstall all unimportant npm packages
+    -windows            : Clean Windows (Disk Cleanup, Temp, Prefetch, Update cache)
+    -eventlogs          : Clear Windows event logs
     -all                : Uninstall all unimportant packages
     -default            : Uninstall all unimportant (pip, npm) packages
     -skipUAC            : Skip User Account Control prompt
@@ -148,25 +151,44 @@ function Clear-Windows {
     Set-Title "Cleaning Windows ($env:windir\Temp)"
     Remove-Item -Path $env:windir\Temp\* -Recurse -Force
 
-    Set-Title "Cleaning Windows Update cache"
-    net stop wuauserv
-    Remove-Item -Path $env:windir\SoftwareDistribution\* -Recurse -Force
-    net start wuauserv
-
-    Set-Title "Cleaning Windows event logs"
-    wevtutil el | ForEach-Object { wevtutil cl $_ }
-
     Set-Title "Cleaning Windows prefetch"
     Remove-Item -Path $env:windir\Prefetch\* -Recurse -Force
 
     Set-Title "Cleaning Windows memory dump"
     Remove-Item -Path $env:windir\memory.dmp -Force
+
+    Set-Title "Cleaning Windows Update cache"
+    net stop wuauserv
+    Remove-Item -Path $env:windir\SoftwareDistribution\* -Recurse -Force
+    net start wuauserv
+}
+function Clear-WindowsEventlogs {
+    Set-Title "Cleaning Windows event logs"
+    $LogNames = Get-WinEvent -ListLog * -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LogName
+    Write-Host "Found $($LogNames.Count) event logs"
+
+    foreach ($LogName in $LogNames) {
+        $txt = "Clearing $LogName"
+        $logSizeMB = -1
+        try {
+            $fistLogEvent = Get-WinEvent -LogName $LogName -MaxEvents 1 --ErrorAction SilentlyContinue
+            $logSizeMB = $fistLogEvent.MaximumSizeInBytes / 1MB
+            $txt += " ($logSizeMB MB)"
+        } catch { }
+        Write-Host $txt
+        try {
+            wevtutil.exe cl "$LogName"
+        } catch {
+            Write-Host "Failed to clear $LogName. Error: $_"
+        }
+    }
 }
 
 if ($allByDefault -and $MyInvocation.BoundParameters.Count -eq 0) {
     $pip = $true
     $npm = $true
     $windows = $true
+    $eventlogs = $true
 }
 elseif ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
     Print-Help
@@ -174,19 +196,19 @@ elseif ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
 }
 
 if (-Not $skipUAC) { Elevate-Script }
-
 if ($all -or $default -or $npm) {
     Backup-Npm
     Clear-Npm
 }
-
 if ($all -or $default -or $pip) {
     Backup-Pip
     Clear-Pip
 }
-
 if ($all -or $default -or $windows) {
     Clear-Windows
+}
+if ($all -or $default -or $eventlogs) {
+    Clear-WindowsEventlogs
 }
 
 pause "Press any key to exit"

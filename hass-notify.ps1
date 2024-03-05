@@ -1,26 +1,25 @@
-$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+# $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 # Write-Output $session
 
-$url = "$env:HASS_SERVER/api/services/notify/all_devices"
-Write-Output $url
+$homeAssistantUrl = $env:HASS_SERVER
+$accessToken = $env:HASS_TOKEN
+$service = "notify"
+$target = "all_devices" # Replace with your notify service entity
 
-$body_json = @{
-  # "target" = @("all")
+$jsonPayload = @{
   "title" = $args[1]
   "message" = $args[0]
 } | ConvertTo-Json
-Write-Output $body_json
 
 $headers = @{
-    "Authorization"="Bearer $env:HASS_TOKEN"
+    "Authorization" = "Bearer $accessToken"
     "Content-Type" = "application/json"
 }
-# Write-Output $headers
 
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true} ;
-$response = Invoke-WebRequest -UseBasicParsing -Uri $url -Method "POST" -WebSession $session -Headers $headers -ContentType "application/json;charset=UTF-8" -Body $body_json
-
+$response = Invoke-RestMethod -Uri "$homeAssistantUrl/api/services/$service/$target" -Method Post -Headers $headers -Body $jsonPayload
 Write-Output $response
+
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG

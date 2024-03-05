@@ -27,13 +27,14 @@ function Log {
         [string]$level = "Info"
     )
     # $message = "$($scriptName): $message"
+    $date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     switch ($level.ToLower()) {
-        "warn" { Write-Warning "[$(Get-Date)] Warning: $message" }
-        "warning" { Write-Warning "[$(Get-Date)] Warning: $message" }
-        "error" { Write-Host "[$(Get-Date)] Error: $message" -ForegroundColor Red}
-        "debug" { if ($debug) { Write-Host "[$(Get-Date)] $message" -ForegroundColor Blue } }
-        "success" { Write-Host "[$(Get-Date)] ✅ $message" -ForegroundColor Green }
-        default { Write-Host "[$(Get-Date)] $message" }
+        "warn" { Write-Warning "[$date] Warning: $message" }
+        "warning" { Write-Warning "[$date] Warning: $message" }
+        "error" { Write-Host "[$date] Error: $message" -ForegroundColor Red}
+        "debug" { if ($debug) { Write-Host "[$date] $message" -ForegroundColor Blue } }
+        "success" { Write-Host "[$date] ✅ $message" -ForegroundColor Green }
+        default { Write-Host "[$date] $message" }
     }
 }
 

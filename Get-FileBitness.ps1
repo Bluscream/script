@@ -7,60 +7,88 @@ function Get-FileBitness {
     param (
         [string]$path
     )
-
-    $bytes = [System.IO.File]::ReadAllBytes($path)
-    $stream = New-Object System.IO.MemoryStream([System.Array]::CreateInstance([byte], $bytes.Length))
-    $writer = New-Object System.IO.BinaryWriter($stream)
-    $reader = New-Object System.IO.BinaryReader($stream)
-
     try {
-        $writer.Write($bytes,  0, $bytes.Length)
-        $reader.BaseStream.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
-        $reader.BaseStream.Seek($reader.ReadUInt32(), [System.IO.SeekOrigin]::Begin) | Out-Null
-        $reader.BaseStream.Seek(0x4, [System.IO.SeekOrigin]::Current) | Out-Null
-
-        switch ($reader.ReadUInt16()) {
-            0x014C { return '32-bit' }
-            0x0200 { return '64-bit' }
-            0x0162 { return 'ARM' }
-            0xAA64 { return 'ARM64' }
-            default { return 'Unknown' }
+        $bytes = [System.IO.File]::ReadAllBytes($path)
+        $stream = New-Object System.IO.MemoryStream([System.Array]::CreateInstance([byte], $bytes.Length))
+        $writer = New-Object System.IO.BinaryWriter($stream)
+        $reader = New-Object System.IO.BinaryReader($stream)
+    
+        try {
+            $writer.Write($bytes,  0, $bytes.Length)
+            $reader.BaseStream.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
+            $reader.BaseStream.Seek($reader.ReadUInt32(), [System.IO.SeekOrigin]::Begin) | Out-Null
+            $reader.BaseStream.Seek(0x4, [System.IO.SeekOrigin]::Current) | Out-Null
+    
+            switch ($reader.ReadUInt16()) {
+                0x014C { return '32-bit' }
+                0x0200 { return '64-bit' }
+                0x0162 { return 'ARM' }
+                0xAA64 { return 'ARM64' }
+                default { return 'Unknown' }
+            }
+        } finally {
+            $reader.Close()
+            $writer.Close()
+            $stream.Close()
         }
-    } finally {
-        $reader.Close()
-        $writer.Close()
-        $stream.Close()
+    } catch {
+        Write-Error $_
     }
+    return 'Unknown'
 }
 function Get-FileBitnessAlt {
     param (
         [string]$path
     )
-
-    $bytes = [System.IO.File]::ReadAllBytes($path)
-    $stream = New-Object System.IO.MemoryStream
-    $writer = New-Object System.IO.BinaryWriter($stream)
-    $reader = New-Object System.IO.BinaryReader($stream)
-
     try {
-        $writer.Write($bytes,  0, $bytes.Length)
-        $stream.Position =  0 # Reset the position to the start of the stream
-        $reader.BaseStream.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
-        $reader.BaseStream.Seek($reader.ReadUInt32(), [System.IO.SeekOrigin]::Begin) | Out-Null
-        $reader.BaseStream.Seek(0x4, [System.IO.SeekOrigin]::Current) | Out-Null
-
-        switch ($reader.ReadUInt16()) {
-            {$_ -eq   0x014C} {return '32-bit'}
-            {$_ -eq   0x0200} {return '64-bit'}
-            default {return 'Unknown'}
+        $bytes = [System.IO.File]::ReadAllBytes($path)
+        $stream = New-Object System.IO.MemoryStream
+        $writer = New-Object System.IO.BinaryWriter($stream)
+        $reader = New-Object System.IO.BinaryReader($stream)
+    
+        try {
+            $writer.Write($bytes,  0, $bytes.Length)
+            $stream.Position =  0 # Reset the position to the start of the stream
+            $reader.BaseStream.Seek(0x3C, [System.IO.SeekOrigin]::Begin) | Out-Null
+            $reader.BaseStream.Seek($reader.ReadUInt32(), [System.IO.SeekOrigin]::Begin) | Out-Null
+            $reader.BaseStream.Seek(0x4, [System.IO.SeekOrigin]::Current) | Out-Null
+    
+            switch ($reader.ReadUInt16()) {
+                {$_ -eq   0x014C} {return '32-bit'}
+                {$_ -eq   0x0200} {return '64-bit'}
+                default {return 'Unknown'}
+        }
+        } finally {
+            $reader.Dispose()
+            $writer.Dispose()
+            $stream.Dispose()
+        }
     } catch {
-        return 'Unknown'
+        Write-Error $_
     }
-    } finally {
-        $reader.Dispose()
-        $writer.Dispose()
-        $stream.Dispose()
+    return 'Unknown'
+}
+
+function Get-MachineFromFileHeader {
+    param (
+        [string]$path
+    )
+    try {
+            $bytes = [System.IO.File]::ReadAllBytes($path)
+            # get file header and read Machine field (0x000000FC)
+            # AMD64 = 0x8664, x86 = 0x014C, ARM = 0x01C0, ARM64 = 0xAA64
+            $machine = [BitConverter]::ToUInt16($bytes, 0x3C + 0x04)
+            switch ($machine) {
+                0x014C { return '32-bit' }
+                0x0200 { return '64-bit' }
+                0x0162 { return 'ARM' }
+                0xAA64 { return 'ARM64' }
+                default { return 'Unknown' }
+            }
+    } catch {
+        Write-Error $_
     }
+    return 'Unknown'
 }
 
 
@@ -70,12 +98,10 @@ Write-Host "Found $($items.Count) files"
 
 $ErrorActionPreference = 'SilentlyContinue'
 $items | ForEach-Object {
-    $bitness = "Unknown"
-    try {
-        $bitness = Get-FileBitnessAlt -path $_.FullName
-        if ($bitness -eq "Unknown") { $bitness = Get-FileBitness -path $_.FullName }
-    } catch { $bitness = Get-FileBitness -path $_.FullName }
-    Write-Output ("{0}: {1}" -f $_.FullName, $bitness)
+    $bitness = Get-FileBitness -path $_.FullName
+    $bitnessAlt = Get-FileBitnessAlt -path $_.FullName
+    $bitnessMachine = Get-MachineFromFileHeader -path $_.FullName
+    Write-Output ("{0}: {1} | alt: {2} | machine {3}" -f $_.FullName, $bitness, $bitnessAlt, $bitnessMachine)
 }
 $ErrorActionPreference = 'Continue'
 # Pause

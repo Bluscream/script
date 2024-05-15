@@ -1,45 +1,74 @@
-$dns = (
-  "192.168.2.23","2003:e3:9f37:1300:f082:2597:c252:1864","fd00::ce45:ae48:3862:e62e"
+# Define the path to your CSV file
+$csvPath = "C:\Scripts\whitelists\processes.csv"
 
-  #"192.168.2.3","fe80::b28b:8f78:573e:4bf6",
-  #"192.168.2.38","fd00::ba98:a7bb:ac07:57fd",
-  #"192.168.2.39","fd00::505f:c63a:83df:2561"
-  # ,"192.168.2.1","2001:4860:4860::8844","2001:4860:4860::8888",
-  # "94.140.14.14","2a10:50c0::ad1:ff",
-  # "94.140.15.15","2a10:50c0::ad2:ff"
-)
+# Read the CSV file and store the process names in a list
+$processesToKeep = (Import-Csv -Path $csvPath).ProcessName
 
-[string]$c = "DNS Servers: {0}" -f $dns
-Write-Host $c
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))  
-{  
-  $arguments = "& '" +$myinvocation.mycommand.definition + "'"
-  Start-Process powershell -Verb runAs -ArgumentList $arguments
-  Break
+# Define a list of special processes to exclude
+$exclusions = @("cmd.exe", "powershell.exe", "terminal.exe", "conhost.exe", $MyInvocation.MyCommand.Name)
+
+# Get all running processes
+$allProcesses = Get-Process
+
+# Initialize counters for killed and remaining processes
+$killedProcesses = 0
+$remainingProcesses = 0
+
+# Define a custom logging function
+function Write-Log {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Message,
+        [Parameter(Mandatory=$true)]
+        [ValidateSet('Information','Warning','Error')]
+        [string]$Severity = 'Information'
+    )
+    [pscustomobject]@{
+        Time = (Get-Date -f g)
+        Message = $Message
+        Severity = $Severity
+    } | Export-Csv -Path "$env:Temp\ProcessTerminationLog.csv" -Append -NoTypeInformation
 }
 
-try {
-    $profiles = Get-NetConnectionProfile -ErrorAction Stop | Select-Object InterfaceAlias, InterfaceIndex
-} catch {
-    Write-Host "Get-NetConnectionProfile is not available. Falling back to Get-NetAdapter."
-    $profiles = Get-NetAdapter | Select-Object Name, InterfaceIndex
+# Iterate through all running processes
+foreach ($process in $allProcesses) {
+    $processNameExe = "$($process.ProcessName).exe"
+    Write-Host "Found $($process.ProcessName) ($processNameExe)"
+    # Check if the process is in the list of processes to keep or in the exclusion list
+    $containsDirect = $processesToKeep -contains $process.ProcessName
+    $containsExe = $processesToKeep -contains $processNameExe
+    $isSpecial = $exclusions -contains $process.ProcessName
+    Write-Host "containsDirect: $containsDirect | containsExe: $containsExe | isSpecial: $isSpecial"
+    if (-not $containsDirect -and -not $containsExe  -and -not $isSpecial) {
+        # Attempt to terminate the process gracefully
+        try {
+            # Stop-Process -Id $process.Id -Force -ErrorAction Stop
+            Write-Host "Gracefully terminated $($process.ProcessName) with PID $($process.Id)"
+            $killedProcesses++
+            Write-Log -Message "Gracefully terminated $($process.ProcessName) with PID $($process.Id)" -Severity Information
+        } catch {
+            # If graceful termination fails, forcefully terminate the process
+            # Stop-Process -Id $process.Id -Force
+            Write-Host "Forcefully terminated $($process.ProcessName) with PID $($process.Id)"
+            $killedProcesses++
+            Write-Log -Message "Forcefully terminated $($process.ProcessName) with PID $($process.Id)" -Severity Warning
+        }
+    } else {
+        $remainingProcesses++
+    }
 }
 
-foreach ($k in $profiles) { # Get-NetAdapter Get-DnsClientServerAddress
-    [string]$c = "Changing DNS for {0} ({1})" -f $k.InterfaceAlias, $k.InterfaceIndex
-    Write-Host $c
-    Set-DNSClientServerAddress -InterfaceIndex $k.InterfaceIndex -ServerAddresses $dns
-}
-  
-  # $Nic1 = (Get-DnsClientServerAddress | where {}).InterfaceAlias
-  
-  # Set-DNSClientServerAddress "InterfaceAlias" –ServerAddresses ("preferred-DNS-address", "alternate-DNS-address")
-Pause
+# Log the summary
+Write-Log -Message "Total processes in CSV: $($processesToKeep.Count)" -Severity Information
+Write-Log -Message "Total running processes: $($allProcesses.Count)" -Severity Information
+Write-Log -Message "Killed processes: $killedProcesses" -Severity Information
+Write-Log -Message "Remaining processes: $remainingProcesses" -Severity Information
+
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCA2fh/yZPWoIsWe
-# DbbTET3H6I7Bk8oKrCFmY/Gz3oskOqCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCABLUmBBhALC448
+# hE/LDZOt52mBJHdHoifnC7ZnnTUY9aCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
 # sEdtdKBCF5GpMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAMMEEFUQSBBdXRoZW50
 # aWNvZGUwHhcNMjMwNTIxMTQ1MjUxWhcNMjQwNTIxMTUxMjUxWjAbMRkwFwYDVQQD
 # DBBBVEEgQXV0aGVudGljb2RlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
@@ -160,29 +189,29 @@ Pause
 # X+Db2a2QgESvgBBBijGCBQUwggUBAgEBMC8wGzEZMBcGA1UEAwwQQVRBIEF1dGhl
 # bnRpY29kZQIQacE1cVrK/bBHbXSgQheRqTANBglghkgBZQMEAgEFAKCBhDAYBgor
 # BgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCBU
-# 3gdZ19dxoVO6XTr1VL27o/ZpCNjVypADGdQxjWTqRDANBgkqhkiG9w0BAQEFAASC
-# AQB24QhY+PCVHfv9SawAEqt6KLYojo6QMoi6e5GT2zRYCv15ST3Wr0cO+TmNQ7Az
-# 4ZK/YFLPKJ6RK95Oqmf9jI/2wHOFwRhlHwZnQCbTuGPJig2wfgTpbWu1mrb2Aes6
-# mVlXas+yguMhJgYxoId6uIx+lIKVb7Dsb8arz/LDzAY0HroxS0Wb9O162aH5ACWn
-# 4CxiVVjnfuO8iE0Xk4gSz7oypif9XOmRqI3CEkwqL1/ovmoUjnOJa4mK+Pdy5ibp
-# w5WDO7A185PVM8iFLoyIiK9+b+a7ezrIm+TcFKaKO/OMYxb/3+fOdReGyJw3ZF4+
-# X5RJs++vPBRYGDUV6DAHm0KGoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
+# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCAM
+# +zL05pyN8lwhFV2fdnQAm7F56FR5Vsk1pXGCNxyG3jANBgkqhkiG9w0BAQEFAASC
+# AQAtVu6lOoBagVJnnAyMqPnK+gq/nRIvMxdMWIpi4OLREEshuDaWp6mj053tJVu8
+# uUB+a5WOPLlpMbY+v55+MKY9WIHv8Kejg43z9a1nAL7KvH5JyzMoe9kXHw8GCcJ9
+# 1SpPCI2/US6bG1bobJl6mGqM6Ocs5rMEPfi32VCHfqYgmbK67zdq/Y+ykbNsin1N
+# jVeDSMTRO/bK7T13RYFqnEoxzSAO1LnAXjRslM9nflX0h2S5L18+g8CpSJ3mR9Xy
+# un8uAbqi127TSQ3ZWMevnpBtwIadLE8yRmNOaKF+MPjht/Jv3zJ250ZsIcKh1AW1
+# kEJ0DzNir/7pLbeI9xf7Tn68oYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
 # MHcwYzELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYD
 # VQQDEzJEaWdpQ2VydCBUcnVzdGVkIEc0IFJTQTQwOTYgU0hBMjU2IFRpbWVTdGFt
 # cGluZyBDQQIQBUSv85SdCDmmv9s/X+VhFjANBglghkgBZQMEAgEFAKBpMBgGCSqG
-# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTgz
-# N1owLwYJKoZIhvcNAQkEMSIEIMQGS0P8O3zXqCHNfRod3TB0dxgu2zo6yrO1hdx4
-# i2LmMA0GCSqGSIb3DQEBAQUABIICABm1Zv6aRZXmOldimg0paXfP5NaSx4DDtgV7
-# UXDBledh2j+OQdpwf8sodxBgp5LywDGaVWCvLAn+awHOx5ZhlB+5NGfN1xYcm2FU
-# IfOxiaINazn6tfeAJFhBQnEEesqwEgQhneCEJ+c0BTErdWpS8XD/63xMA7a0ZIkM
-# yQ6wu9hsQAJRp8wQzIIGosqi9MKQ85l2YY+I8wPBG5Xjl7yS5F/gK/ovfH/1dkQ5
-# NumrYrYlQWFnU/dmk4/4qxZepPjxfIgPDlLKNvTQkzFh8OfBikj5cPRp44NO2iVq
-# tbr3dsJeUefBnGQT64pkyAoKKvayIcgYlwe4PgLkcmazFNJvE2ERHZgXVRooDl/Y
-# Hh8c7qa6UqDL+R6+BwaROI/R6NsCBmOIi3dr9hpf9nOIjhCTxBp3+f4exsy2gzCe
-# P+CPNgM4yosUCMTZwqCZuxae55FbWTjEWEolw2v58ckHGbNRJdH0bSqyf+OesSuY
-# 06HavgOjk+33PDJP4Ae+WO2sP82pA6HvXWIwFFeLBeveve+W1Y9UsnjZ8BMDW7VA
-# Fdz3ZT/104hwpQ4qaiIexU+6VHBoaTaqnS3uFicT1ZrTBS3qUpYOlZ4lfIXfW1nr
-# w0IhSq07dqZwkabeKYGc38mONShwkaoQa3xK9YO5lM2M41l1P8H6kTn4JQyt5rzt
-# SuSQfo+q
+# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTg0
+# MlowLwYJKoZIhvcNAQkEMSIEIHgsCOnjgCy6SEH9P6jWecFI08CNSuN0xTCkFx+n
+# wnCpMA0GCSqGSIb3DQEBAQUABIICAAeH5sLot79mgYRZZRCgBdNbvGWg8Ezo8lHO
+# C3vFqfs9lxRyDO0V6xHH2pVBXwO8QJUlR1JWxqZTwlnCLgPHItdi74spCy4NyXkf
+# FY1aCzLAmWdkCcnD9Jc0Paf+s5T6qMKhKKGK1xO+ercX+pP6D1fbowdb5e3V8o0+
+# YeI5pGZZaneZylukLSY+xnObgicfaj1bSaQgH/T/FEcQHoxmskLaOEQ1qA9lH6Qf
+# uu6TwDNyt58aZ6PQAUeWvw3O0NNykhtyz4lAR2V3mygRKpty/XwHmYmn2RimG49w
+# 6yBU71IOKUpM8GWLW4ozfULo0pbG1R13OLb5zpSYn42zaJBM28FL2gm/urgKZAjp
+# DwZuOW/tzQPXOFptoyjR9AEjIkmje89kBVBPLmuhuDsWeQIIPntr/yW/hyVA7FvX
+# nRTmteyt/WB5EUaeo+5ATVyprVd0n/0J/+f4+SUa0hioYLsfaYGNI/gqqfqonaXo
+# 3usw7YzU5fHPrchmzXg+pYdtfv2wafpI5grKga5PMrOSev6/4w2n88HkEpamJk3h
+# djrqyFXerBUfvC/378xNoC+JInuwpmuS9+Qt4AHL3W/1zoDcCVMJkn2+GyfoZair
+# cH51ZVf5qPjf4IiLWy2o01YYfLcfdcEzNwDihzLDz0aaXymzx6jE06P+sy/9GpWa
+# OxV1pkC8
 # SIG # End signature block

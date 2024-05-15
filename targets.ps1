@@ -1,45 +1,57 @@
-$dns = (
-  "192.168.2.23","2003:e3:9f37:1300:f082:2597:c252:1864","fd00::ce45:ae48:3862:e62e"
-
-  #"192.168.2.3","fe80::b28b:8f78:573e:4bf6",
-  #"192.168.2.38","fd00::ba98:a7bb:ac07:57fd",
-  #"192.168.2.39","fd00::505f:c63a:83df:2561"
-  # ,"192.168.2.1","2001:4860:4860::8844","2001:4860:4860::8888",
-  # "94.140.14.14","2a10:50c0::ad1:ff",
-  # "94.140.15.15","2a10:50c0::ad2:ff"
-)
-
-[string]$c = "DNS Servers: {0}" -f $dns
-Write-Host $c
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))  
-{  
-  $arguments = "& '" +$myinvocation.mycommand.definition + "'"
-  Start-Process powershell -Verb runAs -ArgumentList $arguments
-  Break
+Function pause ($message) {
+    if ($psISE) {
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show("$message")
+    }
+    else {
+        Write-Host "$message" -ForegroundColor Yellow
+        $x = $host.ui.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    }
 }
 
-try {
-    $profiles = Get-NetConnectionProfile -ErrorAction Stop | Select-Object InterfaceAlias, InterfaceIndex
-} catch {
-    Write-Host "Get-NetConnectionProfile is not available. Falling back to Get-NetAdapter."
-    $profiles = Get-NetAdapter | Select-Object Name, InterfaceIndex
+function Get-LinkTarget {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$Path
+    )
+
+    if (Test-Path -Path $Path -PathType Container) {
+        # Process symlink
+        $target = (Get-Item -Path $Path).Target
+    } elseif ($Path -match '\.lnk$') {
+        # Process .lnk file
+        $shell = New-Object -ComObject Shell.Application
+        $folder = $shell.Namespace((Split-Path -Path $Path))
+        $link = $folder.ParseName((Split-Path -Path $Path -Leaf))
+        $target = $link.GetLink.Target.Path
+    } elseif ($Path -match '\.url$') {
+        # Process .url file
+        $urlContent = Get-Content -Path $Path
+        $target = $urlContent | Select-String -Pattern 'URL=(.+)' | ForEach-Object { $_.Matches.Groups[1].Value }
+    }
+
+    return "$Path > $target"
 }
 
-foreach ($k in $profiles) { # Get-NetAdapter Get-DnsClientServerAddress
-    [string]$c = "Changing DNS for {0} ({1})" -f $k.InterfaceAlias, $k.InterfaceIndex
-    Write-Host $c
-    Set-DNSClientServerAddress -InterfaceIndex $k.InterfaceIndex -ServerAddresses $dns
+# Process each argument passed to the script
+foreach ($arg in $args) {
+    if (Test-Path -Path $arg -PathType Container) {
+        # If the argument is a folder, recursively process all link files in the folder and its subfolders
+        Get-ChildItem -Path $arg -Recurse -Include *.lnk, *.url | ForEach-Object {
+            Write-Output (Get-LinkTarget -Path $_.FullName)
+        }
+    } else {
+        # If the argument is not a folder, process it as a single file
+        Write-Output (Get-LinkTarget -Path $arg)
+    }
 }
-  
-  # $Nic1 = (Get-DnsClientServerAddress | where {}).InterfaceAlias
-  
-  # Set-DNSClientServerAddress "InterfaceAlias" –ServerAddresses ("preferred-DNS-address", "alternate-DNS-address")
-Pause
+
+pause "Press any key to close"
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCA2fh/yZPWoIsWe
-# DbbTET3H6I7Bk8oKrCFmY/Gz3oskOqCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDZb9nn+TSeHZqF
+# fWcMeM3t1Tvf5pZKfkyUrIJCFos4XKCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
 # sEdtdKBCF5GpMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAMMEEFUQSBBdXRoZW50
 # aWNvZGUwHhcNMjMwNTIxMTQ1MjUxWhcNMjQwNTIxMTUxMjUxWjAbMRkwFwYDVQQD
 # DBBBVEEgQXV0aGVudGljb2RlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
@@ -160,29 +172,29 @@ Pause
 # X+Db2a2QgESvgBBBijGCBQUwggUBAgEBMC8wGzEZMBcGA1UEAwwQQVRBIEF1dGhl
 # bnRpY29kZQIQacE1cVrK/bBHbXSgQheRqTANBglghkgBZQMEAgEFAKCBhDAYBgor
 # BgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCBU
-# 3gdZ19dxoVO6XTr1VL27o/ZpCNjVypADGdQxjWTqRDANBgkqhkiG9w0BAQEFAASC
-# AQB24QhY+PCVHfv9SawAEqt6KLYojo6QMoi6e5GT2zRYCv15ST3Wr0cO+TmNQ7Az
-# 4ZK/YFLPKJ6RK95Oqmf9jI/2wHOFwRhlHwZnQCbTuGPJig2wfgTpbWu1mrb2Aes6
-# mVlXas+yguMhJgYxoId6uIx+lIKVb7Dsb8arz/LDzAY0HroxS0Wb9O162aH5ACWn
-# 4CxiVVjnfuO8iE0Xk4gSz7oypif9XOmRqI3CEkwqL1/ovmoUjnOJa4mK+Pdy5ibp
-# w5WDO7A185PVM8iFLoyIiK9+b+a7ezrIm+TcFKaKO/OMYxb/3+fOdReGyJw3ZF4+
-# X5RJs++vPBRYGDUV6DAHm0KGoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
+# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCAc
+# a47NRD2MinBp7KEP86kaT4jfzM6ZuzT0wL2uL1lr3zANBgkqhkiG9w0BAQEFAASC
+# AQBGr/qsKNNuFCdqiCvtmTRCkrjdBMs/2yddGj92NKm8cCx0MY39DA8Df0sCtMy1
+# vCg4qUKm/QEwxiiYAJ1/bZoF6/RfY2n/FA3Xykst6s4xe5X4qX0jzoljzqYcJ263
+# gV2e67LH6dLpSDRQSXFOCYcXn/TVff2rEacSwa1TbcPf417sRxwjPRJUjGKNPYpX
+# GeihH7uqCdZV6jRdNA0Xvag/o3PXw+3vFq26N57lxeP4HyEgj/o+H+EehLK7K8p6
+# B7jdADHNTSa4Owr3NIapVjQnGePx7dLibSvOnmsN1CtKBs6qZoNTb3/LbuzrDHqP
+# c5zN+fxHKtT3MokMwiULhgMAoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
 # MHcwYzELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYD
 # VQQDEzJEaWdpQ2VydCBUcnVzdGVkIEc0IFJTQTQwOTYgU0hBMjU2IFRpbWVTdGFt
 # cGluZyBDQQIQBUSv85SdCDmmv9s/X+VhFjANBglghkgBZQMEAgEFAKBpMBgGCSqG
-# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTgz
-# N1owLwYJKoZIhvcNAQkEMSIEIMQGS0P8O3zXqCHNfRod3TB0dxgu2zo6yrO1hdx4
-# i2LmMA0GCSqGSIb3DQEBAQUABIICABm1Zv6aRZXmOldimg0paXfP5NaSx4DDtgV7
-# UXDBledh2j+OQdpwf8sodxBgp5LywDGaVWCvLAn+awHOx5ZhlB+5NGfN1xYcm2FU
-# IfOxiaINazn6tfeAJFhBQnEEesqwEgQhneCEJ+c0BTErdWpS8XD/63xMA7a0ZIkM
-# yQ6wu9hsQAJRp8wQzIIGosqi9MKQ85l2YY+I8wPBG5Xjl7yS5F/gK/ovfH/1dkQ5
-# NumrYrYlQWFnU/dmk4/4qxZepPjxfIgPDlLKNvTQkzFh8OfBikj5cPRp44NO2iVq
-# tbr3dsJeUefBnGQT64pkyAoKKvayIcgYlwe4PgLkcmazFNJvE2ERHZgXVRooDl/Y
-# Hh8c7qa6UqDL+R6+BwaROI/R6NsCBmOIi3dr9hpf9nOIjhCTxBp3+f4exsy2gzCe
-# P+CPNgM4yosUCMTZwqCZuxae55FbWTjEWEolw2v58ckHGbNRJdH0bSqyf+OesSuY
-# 06HavgOjk+33PDJP4Ae+WO2sP82pA6HvXWIwFFeLBeveve+W1Y9UsnjZ8BMDW7VA
-# Fdz3ZT/104hwpQ4qaiIexU+6VHBoaTaqnS3uFicT1ZrTBS3qUpYOlZ4lfIXfW1nr
-# w0IhSq07dqZwkabeKYGc38mONShwkaoQa3xK9YO5lM2M41l1P8H6kTn4JQyt5rzt
-# SuSQfo+q
+# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTg0
+# NVowLwYJKoZIhvcNAQkEMSIEIEIeR3yIJla7imWEJqRJit6WZoBn38wpjj1FTaK4
+# NebWMA0GCSqGSIb3DQEBAQUABIICAHlQz5Vhsd+KlKwJ5QaFEV9uSH8s4wgHXqi8
+# XXkFxlfKXQJvC9dgQWYL5Y+k9BUA283S2ckfKyatugyk91qkOjnrMVR8ynacl30j
+# Q96wdwm6als0xTdskey9iWClyutJU0t/l9D+xvh97R2KJrOoEAn7YaG3/xSvkDO7
+# O38xci9f0XGeA9jHz3UI3Wi0v+JuKp4Uwzfyw8zftdITh1kglHGUsCoeTxUOaQRa
+# WQtMIKZS66Gw+shA4P0u87l5MZyFqQQD9e845RWgczVQXAaCpm8WASlWv+DXh+ej
+# qrf7ImcniSa6EVAosJLywBcCmk9rrYSU+c1yaMYoe6b9PPQzc6FGaObEKRXSxTIi
+# VxaP4Q4sE8WT2GQs0tMSCRU6DpNZTbzGIvTsllqks7VdpLyGETi8p/+D3+Ib3Q65
+# 3ovrEeXsXddlfNdyhy5sHIUlhhEIsv8ByII0z2X1zo1X2ykC9/wHP12LDLeP7nv+
+# Wj/YjHqMvt7PBI5KKcE+guGMEs4mBeJqrrB8D32HrIalxvaKLLFQV2uHi6wNEIel
+# zWIAaZ5obWTeHCPZ2BGuaSQAqEvO6VoLgAGSOnKE/l40oC622MgWwFnVJA7ZUMjU
+# jEuhLjk2fKq6sNC8MCumHbCiNVGP3OfhPg51CCW9b0KYvN5yl1yJ8QCBCC41XDJi
+# aR3FAabX
 # SIG # End signature block

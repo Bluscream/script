@@ -1,45 +1,39 @@
-$dns = (
-  "192.168.2.23","2003:e3:9f37:1300:f082:2597:c252:1864","fd00::ce45:ae48:3862:e62e"
+# $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+# Write-Output $session
 
-  #"192.168.2.3","fe80::b28b:8f78:573e:4bf6",
-  #"192.168.2.38","fd00::ba98:a7bb:ac07:57fd",
-  #"192.168.2.39","fd00::505f:c63a:83df:2561"
-  # ,"192.168.2.1","2001:4860:4860::8844","2001:4860:4860::8888",
-  # "94.140.14.14","2a10:50c0::ad1:ff",
-  # "94.140.15.15","2a10:50c0::ad2:ff"
-)
+$homeAssistantUrl = $env:HASS_SERVER
+$accessToken = $env:HASS_TOKEN
+$service = "notify"
+$target = "all_devices" # Replace with your notify service entity
 
-[string]$c = "DNS Servers: {0}" -f $dns
-Write-Host $c
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))  
-{  
-  $arguments = "& '" +$myinvocation.mycommand.definition + "'"
-  Start-Process powershell -Verb runAs -ArgumentList $arguments
-  Break
+$title = $args[0]
+$message = $args[1];
+# $username = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+# $message = "$username > $message"
+
+$jsonPayload = @{
+  "title" = $title
+  "message" = $message
+} | ConvertTo-Json
+
+$headers = @{
+    "Authorization" = "Bearer $accessToken"
+    "Content-Type" = "application/json"
 }
 
-try {
-    $profiles = Get-NetConnectionProfile -ErrorAction Stop | Select-Object InterfaceAlias, InterfaceIndex
-} catch {
-    Write-Host "Get-NetConnectionProfile is not available. Falling back to Get-NetAdapter."
-    $profiles = Get-NetAdapter | Select-Object Name, InterfaceIndex
+[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true} ;
+$response = Invoke-RestMethod -Uri "$homeAssistantUrl/api/services/$service/$target" -Method Post -Headers $headers -Body $jsonPayload
+Write-Output $response
+if ($null -eq $response -or $response.StatusCode -ne 200) {
+    $host.SetShouldExit(1)
 }
+$host.SetShouldExit(0)
 
-foreach ($k in $profiles) { # Get-NetAdapter Get-DnsClientServerAddress
-    [string]$c = "Changing DNS for {0} ({1})" -f $k.InterfaceAlias, $k.InterfaceIndex
-    Write-Host $c
-    Set-DNSClientServerAddress -InterfaceIndex $k.InterfaceIndex -ServerAddresses $dns
-}
-  
-  # $Nic1 = (Get-DnsClientServerAddress | where {}).InterfaceAlias
-  
-  # Set-DNSClientServerAddress "InterfaceAlias" –ServerAddresses ("preferred-DNS-address", "alternate-DNS-address")
-Pause
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCA2fh/yZPWoIsWe
-# DbbTET3H6I7Bk8oKrCFmY/Gz3oskOqCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCARhA7WyQfFEy0d
+# /n5gzWR5t+EsNpQ1muAifzsyXuXRUKCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
 # sEdtdKBCF5GpMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAMMEEFUQSBBdXRoZW50
 # aWNvZGUwHhcNMjMwNTIxMTQ1MjUxWhcNMjQwNTIxMTUxMjUxWjAbMRkwFwYDVQQD
 # DBBBVEEgQXV0aGVudGljb2RlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
@@ -160,29 +154,29 @@ Pause
 # X+Db2a2QgESvgBBBijGCBQUwggUBAgEBMC8wGzEZMBcGA1UEAwwQQVRBIEF1dGhl
 # bnRpY29kZQIQacE1cVrK/bBHbXSgQheRqTANBglghkgBZQMEAgEFAKCBhDAYBgor
 # BgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCBU
-# 3gdZ19dxoVO6XTr1VL27o/ZpCNjVypADGdQxjWTqRDANBgkqhkiG9w0BAQEFAASC
-# AQB24QhY+PCVHfv9SawAEqt6KLYojo6QMoi6e5GT2zRYCv15ST3Wr0cO+TmNQ7Az
-# 4ZK/YFLPKJ6RK95Oqmf9jI/2wHOFwRhlHwZnQCbTuGPJig2wfgTpbWu1mrb2Aes6
-# mVlXas+yguMhJgYxoId6uIx+lIKVb7Dsb8arz/LDzAY0HroxS0Wb9O162aH5ACWn
-# 4CxiVVjnfuO8iE0Xk4gSz7oypif9XOmRqI3CEkwqL1/ovmoUjnOJa4mK+Pdy5ibp
-# w5WDO7A185PVM8iFLoyIiK9+b+a7ezrIm+TcFKaKO/OMYxb/3+fOdReGyJw3ZF4+
-# X5RJs++vPBRYGDUV6DAHm0KGoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
+# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCA+
+# E0J/E3u1jMrNyvVrLRdNqHXxbFdL5/YvExEJnnSK5DANBgkqhkiG9w0BAQEFAASC
+# AQBrauftO2zfiVYQnbXOaskgvg7EmCv8W+bEjwAYprlE/0QiwbZIfsXbG53ONcjJ
+# OebKgGF+NR+qTuSd+KIqdi8ohpRHnFdciE4uOxIMYtsGRCYeNKXkjZYe+LYhYdPs
+# 7JZ+1eI6lW2FXHDH4gkQMOC9uUPdqiqiUz9Fe7DZR1j2xFXC/Pz2nNdmI3v6bV4/
+# E/xasRoBH6i08NdjDjZgwq54BKEiLN/3ACv/tTLZL+JO4huWCLe7Mfpp0PWySGEt
+# 7EnBRSuZ/GGzN/9xYXX9x3PrY5MEvih9KYSncHLlaoOpOZ+/OFMtvHRR4TqBtrof
+# QeQMr/HAUT8OsSsKwjyQMA0woYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
 # MHcwYzELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYD
 # VQQDEzJEaWdpQ2VydCBUcnVzdGVkIEc0IFJTQTQwOTYgU0hBMjU2IFRpbWVTdGFt
 # cGluZyBDQQIQBUSv85SdCDmmv9s/X+VhFjANBglghkgBZQMEAgEFAKBpMBgGCSqG
 # SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTgz
-# N1owLwYJKoZIhvcNAQkEMSIEIMQGS0P8O3zXqCHNfRod3TB0dxgu2zo6yrO1hdx4
-# i2LmMA0GCSqGSIb3DQEBAQUABIICABm1Zv6aRZXmOldimg0paXfP5NaSx4DDtgV7
-# UXDBledh2j+OQdpwf8sodxBgp5LywDGaVWCvLAn+awHOx5ZhlB+5NGfN1xYcm2FU
-# IfOxiaINazn6tfeAJFhBQnEEesqwEgQhneCEJ+c0BTErdWpS8XD/63xMA7a0ZIkM
-# yQ6wu9hsQAJRp8wQzIIGosqi9MKQ85l2YY+I8wPBG5Xjl7yS5F/gK/ovfH/1dkQ5
-# NumrYrYlQWFnU/dmk4/4qxZepPjxfIgPDlLKNvTQkzFh8OfBikj5cPRp44NO2iVq
-# tbr3dsJeUefBnGQT64pkyAoKKvayIcgYlwe4PgLkcmazFNJvE2ERHZgXVRooDl/Y
-# Hh8c7qa6UqDL+R6+BwaROI/R6NsCBmOIi3dr9hpf9nOIjhCTxBp3+f4exsy2gzCe
-# P+CPNgM4yosUCMTZwqCZuxae55FbWTjEWEolw2v58ckHGbNRJdH0bSqyf+OesSuY
-# 06HavgOjk+33PDJP4Ae+WO2sP82pA6HvXWIwFFeLBeveve+W1Y9UsnjZ8BMDW7VA
-# Fdz3ZT/104hwpQ4qaiIexU+6VHBoaTaqnS3uFicT1ZrTBS3qUpYOlZ4lfIXfW1nr
-# w0IhSq07dqZwkabeKYGc38mONShwkaoQa3xK9YO5lM2M41l1P8H6kTn4JQyt5rzt
-# SuSQfo+q
+# OFowLwYJKoZIhvcNAQkEMSIEICXz5A4mMtoWbpQrZQcpQAQXtyCVXdWgN95b9EDN
+# adW2MA0GCSqGSIb3DQEBAQUABIICAAEedhRFuEOshtSMEcX+l7oGpVBnf1F98J+v
+# pEbCo87rWW3bIovzHY+fIZLIJpRzxR1YoiGt4w43k/jvgvG8a2WY0eLik6l2DXZI
+# jduPjPhoDGsOKh8quw/SNvTN0cqD9213ANJAZz1SZZORBSe6hWkPa5lyJa2HcZj4
+# kebSpPMI2gVdos7bSHBWoiQwJ/NvS/5S9vR4syNQTuLJwKxZVXu+x0qzqqqQyygy
+# YSPHHKI7dK0Mih47gmHzUluBPh/B/hEyvbRybUDKqmjWOysqeHEY6Dwbvnd421zm
+# uWOFe0KtwVapTKeUTKuWmU/4mibNGnlZPqe7soFXwgxvKy9fbtcE9tOHWZNI7C90
+# 8Ul08VRd/i+xn03BAOVQC8+KbTOTMbcRa1W9SGSLuv+EwZ+ERv/S9YlsTfeHYwAX
+# XR0561iC9okcaPlxR10Eeptt7ZWsVgdjog5RartDvZTRO+Tjs06qQ0Dr+jg/vH7X
+# j++alq95GSSfzqyRC7YYUxdWtOkUxTgOFGWM4E2KsDP3DOXlL1ozW93CB465f6sP
+# cGSzmadoqBi42EvS0qdY6DoxQbOVXcmpl/CeIwwbb2HYe+S8ZeKdM66ZfZ/evK1c
+# GsTvDVAVyRVumh7Ut86MltjOwzXWRZlYmU3NS1j2ht7RYthK6HBj8Mtu0yILSOU1
+# Dpytw4HT
 # SIG # End signature block

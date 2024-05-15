@@ -86,11 +86,11 @@ function Execute-CompleteAction {
             return $true
         }
         'Shutdown' {
-            shutdown.exe /s /t  0
+            psshutdown.exe /s /t  0
             return $true
         }
         'Reboot' {
-            shutdown.exe /r /t  0
+            psshutdown.exe /r /t  0
             return $true
         }
         'Hibernate' {
@@ -221,13 +221,13 @@ if ($all -or $default -or $scoop) { $scoop_success = Update-Scoop }
 
 if ($all -or $default -or $chocolatey) { $chocolatey_success = Update-Chocolatey }
 
-if ($all -or $default -or $winget) { $winget_success = Update-Winget }
-
 if ($all -or $default -or $windows) { $windows_success = Update-Windows }
 
-if ($all -or $npm) { $npm_success = Update-Npm }
+if ($all -or $default -or $npm) { $npm_success = Update-Npm }
 
-if ($all -or $pip) { $pip_success = Update-Pip }
+if ($all -or $default -or $pip) { $pip_success = Update-Pip }
+
+if ($all -or $default -or $winget) { $winget_success = Update-Winget }
 
 if (!$scoop_success) { Write-Host "Failed to update scoop" -ForegroundColor Red }
 if (!$chocolatey_success) { Write-Host "Failed to update chocolatey" -ForegroundColor Red }
@@ -252,8 +252,8 @@ pause "Press any key to exit"
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAa2Ry6Z+OxSS8P
-# QSX8rGo7TpO2q15bV+z6PKRK41GGRqCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCChfSyhXhSk1wB/
+# epWLkWOOKxRMi8d7fA1thdDwJ2nJHaCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
 # sEdtdKBCF5GpMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAMMEEFUQSBBdXRoZW50
 # aWNvZGUwHhcNMjMwNTIxMTQ1MjUxWhcNMjQwNTIxMTUxMjUxWjAbMRkwFwYDVQQD
 # DBBBVEEgQXV0aGVudGljb2RlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
@@ -374,29 +374,29 @@ pause "Press any key to exit"
 # X+Db2a2QgESvgBBBijGCBQUwggUBAgEBMC8wGzEZMBcGA1UEAwwQQVRBIEF1dGhl
 # bnRpY29kZQIQacE1cVrK/bBHbXSgQheRqTANBglghkgBZQMEAgEFAKCBhDAYBgor
 # BgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCC5
-# NC2ZpJQvkEZwb/I04/BnM+q8SaijHH73Cw8myiOfpDANBgkqhkiG9w0BAQEFAASC
-# AQB+VKlHbuLn59Fw+0acLpzInanUdm591NMpKyWwarwz7wwMe/i22Rkk/AH1X70j
-# FKFPQDjYqaHAdI1JT3kgpebU/wmH6WrpJ0vD39bsKHSuIAqK4LLlIjGE6AU/8bf+
-# yUHubGi+bvbl0WY1rFHi2S5mDO0pZGrqbaOGWfuD6hor9WSH6l0y7B6f96cIFdD4
-# CkNZJqLGeaG/ZSHuvnaHrFF65X0SkjWczVBHAXGuhcmxVJynOoNuTkpEAYLzj6AW
-# hDnrb1cQqIqG//scUH/yNHvWNEED6kbXeyp9sUUXxR5lUoPbIv/z2cl9f88lFd4b
-# feQcIXNlGRWo+K2F9wst3YyUoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
+# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCAR
+# yE/6a1dONquk6PuWoUJpeEPKSnTHIx9nGdAc+/OTczANBgkqhkiG9w0BAQEFAASC
+# AQAY7KMsZO9x62BQ8w8Tl3aYhp+e13LcxzrJgJ1GF0+MkskxyEjRoSTQSafoT9El
+# 8ba4kVj7czhtOhAgLf7uKjHj7ZAQErWGXsCkHWF4ZXhgCXdotzmSKD6FEWrqWrwJ
+# 5kWuNIIz2FUumTOVyRPAR+F45RDve2yEP/GDHYqbTHLHqeuOTm+gQm79BCtaaQyO
+# mN5LZFvsji79WyWdCAm8Lxkr0npUUkPUpWR7KEbNHH2y3+sW+BksqPMN1hAV41x5
+# of0W4di8k3T3Q2bUqaJxZZoGi6t6U7k7ojOPwhAa7l4sEW4s6Z4USdXHf98/3BlS
+# CtazXHR1xfilA74vUPxJtbFloYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
 # MHcwYzELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYD
 # VQQDEzJEaWdpQ2VydCBUcnVzdGVkIEc0IFJTQTQwOTYgU0hBMjU2IFRpbWVTdGFt
 # cGluZyBDQQIQBUSv85SdCDmmv9s/X+VhFjANBglghkgBZQMEAgEFAKBpMBgGCSqG
-# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDMwNTAxMjQz
-# NlowLwYJKoZIhvcNAQkEMSIEIKyW6ZidbFdKVSpDP4QNFC5izgdJk1FK1ksIlnyW
-# 3j9uMA0GCSqGSIb3DQEBAQUABIICAJCXZho3wd0ECKQtTX4JBomI5PMwWlIBwMQn
-# qTU3vLnfRiFgksUM7LOjRqDziJCmh8l3MHOI6fReJXfoCP8fu3qnu0E6JN0NDODC
-# /UAQx48yPrSfuUch568OIqqA6SMhRDxeqkw1woHljuMZrTzXqLeJvvb6F9bb6Mlb
-# 1BXF7/dFXmyCTIEE4/3qW268pT0r5Bd0KBNaZQaiB6s76jgi1AlNJpf2rSJTwAom
-# PNabwNEhQBtA6a2qJkngukeDQSR5vPi67deLnMp5uTWFPaEktvCmjnMIm/Dauz3K
-# AW3gbWk+iC8tDBVaeU2JDW453UkAGXC/EYOBNn8dWi2gC7jpvWh/8puIQIhSH2gB
-# gqIMYo99x3mYVSyAnRdcI1rCqwjHVgIxK5RP/eZPxLAN3tyGfvns4OkL6Cnq/eZ8
-# enHuGNTQY87zw4R8NeTvrHY15JDrQX/iPFGaVTemtRSR12zeOBKsBeqxEWSs021x
-# 6zJVBR1CDf5J/z2Tar6SpBe4WJfkUzxbvgvxSyWCzcE7nhEb1O3ywGcSutQsPekU
-# OuCv4bEL0pQbuKEZtAtZcKcwC7fQ76dfFNRBM8RVz+fCzTX69HqpXwVcgV1ZtRJt
-# dmUBAgPKP57diRAsoAmsmQ6lm6mgjcrJAP3tTFbbHJ9mfB5tg+FtHAleE4SDzAej
-# hShqbjTT
+# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTg0
+# NlowLwYJKoZIhvcNAQkEMSIEIDVoADMyHxm1861oQp04MZ9sEbarAmxCetw3FZ9e
+# tiYWMA0GCSqGSIb3DQEBAQUABIICACsUbAaDG10AFYPnMPSEQdSHxkxG1ZN1uypb
+# 5qUyymsseu5aqMO2ednJFAud81NQ0Xu5hpteh1pATQ+mIWDebbZCGhrKZ+CC8T7Y
+# k3x+521+5tI3csr5fbWrwPbiWvTw3mET+1B7hY1wqqEbQMIvL6tFq87Us3+9TKgL
+# n405PqXJ3LzFCQuw+c6GfVSQe3BwcmudfZRe2NwLiMhdrCv1sasW8843RAPym2/Y
+# OtY8t+go17CZBZfopW8HpFpYYAPLKvJGZiMOghAiWoiZXuAL7zxH2gui2U9nlwRc
+# 2wefYJZi+CrFeSP95DwiWUUO3A8gWnWhzAmmrnwf6zycBou6qWwIs2zDP9ql0Asn
+# gxb33ilz+6/Q7We9xDDAoG2Waln25ZHEu0azzDUlMwbzjks7QLtnj1TXo9TRLBhy
+# HuBcfI6wP26FmPin2bqXjtQauXyyhbHGT8XBulNaYqoMElr5XdEXsbWabbyj3iBQ
+# qVWiEe6n3XcRkOjybxVqloqjxWUVaPAGDWJAjA8evidfd47H+VmXaFCsWo1i/AU9
+# wrkL2LAlOhzKJ0Un8CABZiDhxBvktnZyO3eEJQuuJtyIsETk2Wc7m0ME6H8E+hof
+# vQ5RR8Xf8V2+FZyjnxdPs8g6xRA0dRD2WRVLPTiZ1G7gPLkOS5mIuM8ZFmvYgL4T
+# 4CzgdHxS
 # SIG # End signature block

@@ -1,45 +1,120 @@
-$dns = (
-  "192.168.2.23","2003:e3:9f37:1300:f082:2597:c252:1864","fd00::ce45:ae48:3862:e62e"
-
-  #"192.168.2.3","fe80::b28b:8f78:573e:4bf6",
-  #"192.168.2.38","fd00::ba98:a7bb:ac07:57fd",
-  #"192.168.2.39","fd00::505f:c63a:83df:2561"
-  # ,"192.168.2.1","2001:4860:4860::8844","2001:4860:4860::8888",
-  # "94.140.14.14","2a10:50c0::ad1:ff",
-  # "94.140.15.15","2a10:50c0::ad2:ff"
+param(
+    [string]$DumpFolder,
+    [Parameter(Mandatory=$true, ValueFromRemainingArguments=$true)]
+    [string[]]$FilePaths
 )
 
-[string]$c = "DNS Servers: {0}" -f $dns
-Write-Host $c
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))  
-{  
-  $arguments = "& '" +$myinvocation.mycommand.definition + "'"
-  Start-Process powershell -Verb runAs -ArgumentList $arguments
-  Break
+$Domains = $true;
+$Urls = $true;
+
+# Function to get domain from URL
+function Get-DomainFromURL {
+    param(
+        [string]$URL
+    )
+    try {
+        $uri = [System.Uri]::new($URL)
+        return $uri.Host
+    }
+    catch {
+        Write-Error "Error parsing URL: $URL"
+    }
 }
 
-try {
-    $profiles = Get-NetConnectionProfile -ErrorAction Stop | Select-Object InterfaceAlias, InterfaceIndex
-} catch {
-    Write-Host "Get-NetConnectionProfile is not available. Falling back to Get-NetAdapter."
-    $profiles = Get-NetAdapter | Select-Object Name, InterfaceIndex
+# Initialize dictionaries for domains and URLs
+$domainCounts = @{}
+$urlCounts = @{}
+
+foreach ($filePath in $FilePaths) {
+    # Check if the file exists
+    if (-not (Test-Path $filePath)) {
+        Write-Output "File not found: $filePath"
+        continue
+    }
+
+    # Read the HAR file content
+    $harContent = Get-Content -Path $filePath -Raw
+
+    # Parse the JSON content
+    $harData = $harContent | ConvertFrom-Json
+
+    # Extract domains and URLs
+    foreach ($entry in $harData.log.entries) {
+        $requestUrl = $entry.request.url
+        $domain = Get-DomainFromURL -URL $requestUrl
+
+        # Increment domain count
+        if ($domainCounts.ContainsKey($domain)) {
+            $domainCounts[$domain]++
+        } else {
+            $domainCounts[$domain] = 1
+        }
+
+        # Remove query string and fragment
+        $urlWithoutQuery = $requestUrl -replace '\?.*$', ''
+        $urlWithoutFragment = $urlWithoutQuery -replace '#.*$', ''
+
+        # Increment URL count
+        if ($urlCounts.ContainsKey($urlWithoutFragment)) {
+            $urlCounts[$urlWithoutFragment]++
+        } else {
+            $urlCounts[$urlWithoutFragment] = 1
+        }
+    }
 }
 
-foreach ($k in $profiles) { # Get-NetAdapter Get-DnsClientServerAddress
-    [string]$c = "Changing DNS for {0} ({1})" -f $k.InterfaceAlias, $k.InterfaceIndex
-    Write-Host $c
-    Set-DNSClientServerAddress -InterfaceIndex $k.InterfaceIndex -ServerAddresses $dns
+$domainsSorted = $domainCounts.GetEnumerator() | ForEach-Object {
+    [PSCustomObject]@{
+        Domain = $_.Key
+        Count = $_.Value
+    }
+} | Sort-Object -Property Count -Descending ;
+$urlsSorted = $urlCounts.GetEnumerator() | ForEach-Object {
+    [PSCustomObject]@{
+        URL = $_.Key
+        Count = $_.Value
+    }
+} | Sort-Object -Property Count -Descending;
+
+if ($Domains) {
+    Write-Output "Domains:"
+    $domainsSorted | Format-Table -AutoSize
 }
-  
-  # $Nic1 = (Get-DnsClientServerAddress | where {}).InterfaceAlias
-  
-  # Set-DNSClientServerAddress "InterfaceAlias" –ServerAddresses ("preferred-DNS-address", "alternate-DNS-address")
-Pause
+if ($Urls) {
+    Write-Output "URLs:"
+    $urlsSorted | Format-Table -AutoSize
+}
+
+# Optionally dump domains and URLs to CSV files with custom headers
+if ($DumpFolder) {
+    if (-not (Test-Path $DumpFolder)) {
+        New-Item -ItemType Directory -Path $DumpFolder | Out-Null
+    }
+    if ($Domains) {
+        # Create custom header for domains
+        $customHeaderDomains = 'Domain,Count'
+        # Convert domain counts to CSV format, excluding the header
+        $dataRowsDomains = $domainsSorted | ConvertTo-Csv -NoTypeInformation | Select-Object -Skip 1
+        # Combine custom header and data rows
+        $customHeaderDomains, $dataRowsDomains | Set-Content -Path "$DumpFolder\domains.csv" -Encoding utf8
+        Write-Output "Domains dumped to $DumpFolder\domains.csv"
+    }
+    if ($Urls) {
+        # Create custom header for URLs
+        $customHeaderUrls = 'URL,Count'
+        # Convert URL counts to CSV format, excluding the header
+        $dataRowsUrls = $urlsSorted | ConvertTo-Csv -NoTypeInformation | Select-Object -Skip 1
+        # Combine custom header and data rows
+        $customHeaderUrls, $dataRowsUrls | Set-Content -Path "$DumpFolder\urls.csv" -Encoding utf8
+        Write-Output "URLs dumped to $DumpFolder\urls.csv"
+    }
+}
+
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCA2fh/yZPWoIsWe
-# DbbTET3H6I7Bk8oKrCFmY/Gz3oskOqCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDA7r1xGFuRorBm
+# nrhJRdN4mfJxSXD4UCA2qPOxEI5sEaCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
 # sEdtdKBCF5GpMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAMMEEFUQSBBdXRoZW50
 # aWNvZGUwHhcNMjMwNTIxMTQ1MjUxWhcNMjQwNTIxMTUxMjUxWjAbMRkwFwYDVQQD
 # DBBBVEEgQXV0aGVudGljb2RlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
@@ -160,29 +235,29 @@ Pause
 # X+Db2a2QgESvgBBBijGCBQUwggUBAgEBMC8wGzEZMBcGA1UEAwwQQVRBIEF1dGhl
 # bnRpY29kZQIQacE1cVrK/bBHbXSgQheRqTANBglghkgBZQMEAgEFAKCBhDAYBgor
 # BgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCBU
-# 3gdZ19dxoVO6XTr1VL27o/ZpCNjVypADGdQxjWTqRDANBgkqhkiG9w0BAQEFAASC
-# AQB24QhY+PCVHfv9SawAEqt6KLYojo6QMoi6e5GT2zRYCv15ST3Wr0cO+TmNQ7Az
-# 4ZK/YFLPKJ6RK95Oqmf9jI/2wHOFwRhlHwZnQCbTuGPJig2wfgTpbWu1mrb2Aes6
-# mVlXas+yguMhJgYxoId6uIx+lIKVb7Dsb8arz/LDzAY0HroxS0Wb9O162aH5ACWn
-# 4CxiVVjnfuO8iE0Xk4gSz7oypif9XOmRqI3CEkwqL1/ovmoUjnOJa4mK+Pdy5ibp
-# w5WDO7A185PVM8iFLoyIiK9+b+a7ezrIm+TcFKaKO/OMYxb/3+fOdReGyJw3ZF4+
-# X5RJs++vPBRYGDUV6DAHm0KGoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
+# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCDT
+# VXb5gjMNmyd6o3THmJXD95uu3t0Cno40H/zTNwKkUTANBgkqhkiG9w0BAQEFAASC
+# AQBRupR4eNdclmR6nallnmjqVgaUn3TQvR/GJ76Qsr459bsZn8V4sWCgZ96SlNdN
+# sjbw5kjwt710pSXzNr3eYKJsGxPD6L8MHW0Y9klaEp6+5Ze8VuFawMsm8gLc4k2p
+# YPUlq2Z6T4XtjTQm48LLyO+e4jjIUDmlA7kbDipQs0vWvqFnh01HNJqubzV9qrjD
+# 3syD//UIzEKDyi40FQM8dFgb/fVaRxY8T/caE50RGxXiYzmBo0tSWHwdVqvAPOKT
+# Eitbaj2iiPAumQgQbllmu8dqQTENqoPb0LcERKrj3Za8BloXDbtlKoJlQNvIlLHN
+# qKpFYUBAq65XoHmdj8g60awFoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
 # MHcwYzELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYD
 # VQQDEzJEaWdpQ2VydCBUcnVzdGVkIEc0IFJTQTQwOTYgU0hBMjU2IFRpbWVTdGFt
 # cGluZyBDQQIQBUSv85SdCDmmv9s/X+VhFjANBglghkgBZQMEAgEFAKBpMBgGCSqG
-# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTgz
-# N1owLwYJKoZIhvcNAQkEMSIEIMQGS0P8O3zXqCHNfRod3TB0dxgu2zo6yrO1hdx4
-# i2LmMA0GCSqGSIb3DQEBAQUABIICABm1Zv6aRZXmOldimg0paXfP5NaSx4DDtgV7
-# UXDBledh2j+OQdpwf8sodxBgp5LywDGaVWCvLAn+awHOx5ZhlB+5NGfN1xYcm2FU
-# IfOxiaINazn6tfeAJFhBQnEEesqwEgQhneCEJ+c0BTErdWpS8XD/63xMA7a0ZIkM
-# yQ6wu9hsQAJRp8wQzIIGosqi9MKQ85l2YY+I8wPBG5Xjl7yS5F/gK/ovfH/1dkQ5
-# NumrYrYlQWFnU/dmk4/4qxZepPjxfIgPDlLKNvTQkzFh8OfBikj5cPRp44NO2iVq
-# tbr3dsJeUefBnGQT64pkyAoKKvayIcgYlwe4PgLkcmazFNJvE2ERHZgXVRooDl/Y
-# Hh8c7qa6UqDL+R6+BwaROI/R6NsCBmOIi3dr9hpf9nOIjhCTxBp3+f4exsy2gzCe
-# P+CPNgM4yosUCMTZwqCZuxae55FbWTjEWEolw2v58ckHGbNRJdH0bSqyf+OesSuY
-# 06HavgOjk+33PDJP4Ae+WO2sP82pA6HvXWIwFFeLBeveve+W1Y9UsnjZ8BMDW7VA
-# Fdz3ZT/104hwpQ4qaiIexU+6VHBoaTaqnS3uFicT1ZrTBS3qUpYOlZ4lfIXfW1nr
-# w0IhSq07dqZwkabeKYGc38mONShwkaoQa3xK9YO5lM2M41l1P8H6kTn4JQyt5rzt
-# SuSQfo+q
+# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTg0
+# MVowLwYJKoZIhvcNAQkEMSIEIJ5mtNnPGPHXpoo0NeR6Pt3iY3Y+S63ID23eEKll
+# kkTpMA0GCSqGSIb3DQEBAQUABIICAHAcVtmXtnzzZoP0GyYaQHjBQS4yUjoJ/keW
+# RjoOQ8ys+g48ukV2yPbvK+2vJaO8YRnCWTUO9/ooW53i68m7c99/1tZwPSde6NIC
+# 7/H7Q8zL5xucisqVyaMk7tDgcjAWBzap5BVl0tu/C6lc0q3wUbPZOJhDWuNYbNWU
+# nSpUFvqDa6n9gMyUwuoSwIzYuL2npVdALdueTgN5PfFiHqr2DvPmfJ9Wlf/4hB4k
+# 1ZNNmn/xONlmilHPk0qURbFs4fUQvEuJ/JKpD0gsCB75nol8t7aqgq3fkT/RfL06
+# GRluMPVqEkDmMsojyKCum5+UuX8RZgPbKpZ/9y71tQePKnzMNzLYlikJAZ0zv79P
+# 5c38y0sewk6B6C50OzbwMpptGarU+umCLvtcF8Hqa+g3PhoP1RAqIwiLnRS3bOQ0
+# p2ePMCBojrXFNncC7qvoARH6auNv11RTwxecHv3ytV8eC98naM++MvLm/Jjej4N7
+# Oa1DwFhdIzC4CFFISFBtdCgDliFdutsaT4CFnt+LXPiLDRdLiLUgfyyJp8G2g5Sl
+# sGrsE2xVaw5UG1napoBgturQw/XIP6hX8DFk9mcRo9cVGSOpy5dU/d1R3VgNFQQL
+# D1RmDt4H28/OBC+4jW1sZdi5tSjMH4fKSsMcxSQUpdZhxuzXDK6RH59gCfS+x1Gr
+# OBwR9obr
 # SIG # End signature block

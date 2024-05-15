@@ -1,45 +1,59 @@
-$dns = (
-  "192.168.2.23","2003:e3:9f37:1300:f082:2597:c252:1864","fd00::ce45:ae48:3862:e62e"
+# Define the names of the WiFi adapters based on the output of ipconfig /all
+$wifi5GhzAdapterName = "Wi-Fi (5Ghz)"
+$wifi24GhzAdapterName = "Wi-Fi (2.4Ghz)"
 
-  #"192.168.2.3","fe80::b28b:8f78:573e:4bf6",
-  #"192.168.2.38","fd00::ba98:a7bb:ac07:57fd",
-  #"192.168.2.39","fd00::505f:c63a:83df:2561"
-  # ,"192.168.2.1","2001:4860:4860::8844","2001:4860:4860::8888",
-  # "94.140.14.14","2a10:50c0::ad1:ff",
-  # "94.140.15.15","2a10:50c0::ad2:ff"
-)
+# Function to disable and enable all network adapters
+function Restart-NetworkAdapters {
+    # Get all network adapters
+    $adapters = Get-NetAdapter
 
-[string]$c = "DNS Servers: {0}" -f $dns
-Write-Host $c
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))  
-{  
-  $arguments = "& '" +$myinvocation.mycommand.definition + "'"
-  Start-Process powershell -Verb runAs -ArgumentList $arguments
-  Break
+    # Disable all adapters
+    foreach ($adapter in $adapters) {
+        Disable-NetAdapter -Name $adapter.Name -Confirm:$false
+    }
+
+    # Enable all adapters
+    foreach ($adapter in $adapters) {
+        Enable-NetAdapter -Name $adapter.Name -Confirm:$false
+    }
 }
 
-try {
-    $profiles = Get-NetConnectionProfile -ErrorAction Stop | Select-Object InterfaceAlias, InterfaceIndex
-} catch {
-    Write-Host "Get-NetConnectionProfile is not available. Falling back to Get-NetAdapter."
-    $profiles = Get-NetAdapter | Select-Object Name, InterfaceIndex
+# Function to connect a specific WiFi adapter to a specific network
+function Connect-WiFiAdapterToNetwork {
+    param(
+        [string]$adapterName,
+        [string]$networkName
+    )
+
+    # Connect the specified adapter to the specified network
+    $adapter = Get-NetAdapter | Where-Object { $_.Name -eq $adapterName }
+    if ($adapter) {
+        $network = Get-NetWLANProfile | Where-Object { $_.Name -eq $networkName }
+        if ($network) {
+            Set-NetConnectionProfile -InterfaceIndex $adapter.InterfaceIndex -NetworkCategory Private
+            netsh wlan connect name=$networkName
+        } else {
+            Write-Host "Network $networkName not found."
+        }
+    } else {
+        Write-Host "Adapter $adapterName not found."
+    }
 }
 
-foreach ($k in $profiles) { # Get-NetAdapter Get-DnsClientServerAddress
-    [string]$c = "Changing DNS for {0} ({1})" -f $k.InterfaceAlias, $k.InterfaceIndex
-    Write-Host $c
-    Set-DNSClientServerAddress -InterfaceIndex $k.InterfaceIndex -ServerAddresses $dns
-}
-  
-  # $Nic1 = (Get-DnsClientServerAddress | where {}).InterfaceAlias
-  
-  # Set-DNSClientServerAddress "InterfaceAlias" –ServerAddresses ("preferred-DNS-address", "alternate-DNS-address")
-Pause
+# Restart all network adapters
+Restart-NetworkAdapters
+
+# Connect the 5GHz WiFi adapter to LH5
+Connect-WiFiAdapterToNetwork -adapterName $wifi5GhzAdapterName -networkName "LH5"
+
+# Connect the 2.4GHz WiFi adapter to LH
+Connect-WiFiAdapterToNetwork -adapterName $wifi24GhzAdapterName -networkName "LH"
+
 # SIG # Begin signature block
 # MIIbwgYJKoZIhvcNAQcCoIIbszCCG68CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCA2fh/yZPWoIsWe
-# DbbTET3H6I7Bk8oKrCFmY/Gz3oskOqCCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBUPbQm1sBJgB2s
+# PYK9xALkgPIcZfunrsktK84QMXbQe6CCFhMwggMGMIIB7qADAgECAhBpwTVxWsr9
 # sEdtdKBCF5GpMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAMMEEFUQSBBdXRoZW50
 # aWNvZGUwHhcNMjMwNTIxMTQ1MjUxWhcNMjQwNTIxMTUxMjUxWjAbMRkwFwYDVQQD
 # DBBBVEEgQXV0aGVudGljb2RlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
@@ -160,29 +174,29 @@ Pause
 # X+Db2a2QgESvgBBBijGCBQUwggUBAgEBMC8wGzEZMBcGA1UEAwwQQVRBIEF1dGhl
 # bnRpY29kZQIQacE1cVrK/bBHbXSgQheRqTANBglghkgBZQMEAgEFAKCBhDAYBgor
 # BgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEE
-# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCBU
-# 3gdZ19dxoVO6XTr1VL27o/ZpCNjVypADGdQxjWTqRDANBgkqhkiG9w0BAQEFAASC
-# AQB24QhY+PCVHfv9SawAEqt6KLYojo6QMoi6e5GT2zRYCv15ST3Wr0cO+TmNQ7Az
-# 4ZK/YFLPKJ6RK95Oqmf9jI/2wHOFwRhlHwZnQCbTuGPJig2wfgTpbWu1mrb2Aes6
-# mVlXas+yguMhJgYxoId6uIx+lIKVb7Dsb8arz/LDzAY0HroxS0Wb9O162aH5ACWn
-# 4CxiVVjnfuO8iE0Xk4gSz7oypif9XOmRqI3CEkwqL1/ovmoUjnOJa4mK+Pdy5ibp
-# w5WDO7A185PVM8iFLoyIiK9+b+a7ezrIm+TcFKaKO/OMYxb/3+fOdReGyJw3ZF4+
-# X5RJs++vPBRYGDUV6DAHm0KGoYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
+# MBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEVMC8GCSqGSIb3DQEJBDEiBCDU
+# /7H0+GL2iZw901um+r0pFc4S0/luEhsclNNvWhuoqDANBgkqhkiG9w0BAQEFAASC
+# AQBd34d9Omws7HMNbfj2NuJClOL4gzRrf09h2XIq+FrBCdzMXEfM9fI7OkB1Ybs1
+# GfyjyFHF5lMwA90Aq0ujvkcysmoyich8n+oxSPxOgc4EQV/VH7JWJX67g77yv5I/
+# 24OL5/8hBv84Y8QQK7nSQj1S7hoj/rnTHZHr/gZaf+72kzZded3ZZ0+6c7fDOOR4
+# DHZ/agy9RkEvZzXteOGR0aDI1yeMgWSW3MLR6CcSHL25S+sJPEuN/RDAupL/Ycno
+# oh5LIiEdpR+Wx4Us0xoDa48JfAyrGfIYeeg7/vkyFge+KREu6tztVLMDdiwI3dls
+# K6VcqdOJhXY337QKW5HZ0kQ9oYIDIDCCAxwGCSqGSIb3DQEJBjGCAw0wggMJAgEB
 # MHcwYzELMAkGA1UEBhMCVVMxFzAVBgNVBAoTDkRpZ2lDZXJ0LCBJbmMuMTswOQYD
 # VQQDEzJEaWdpQ2VydCBUcnVzdGVkIEc0IFJTQTQwOTYgU0hBMjU2IFRpbWVTdGFt
 # cGluZyBDQQIQBUSv85SdCDmmv9s/X+VhFjANBglghkgBZQMEAgEFAKBpMBgGCSqG
-# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTgz
-# N1owLwYJKoZIhvcNAQkEMSIEIMQGS0P8O3zXqCHNfRod3TB0dxgu2zo6yrO1hdx4
-# i2LmMA0GCSqGSIb3DQEBAQUABIICABm1Zv6aRZXmOldimg0paXfP5NaSx4DDtgV7
-# UXDBledh2j+OQdpwf8sodxBgp5LywDGaVWCvLAn+awHOx5ZhlB+5NGfN1xYcm2FU
-# IfOxiaINazn6tfeAJFhBQnEEesqwEgQhneCEJ+c0BTErdWpS8XD/63xMA7a0ZIkM
-# yQ6wu9hsQAJRp8wQzIIGosqi9MKQ85l2YY+I8wPBG5Xjl7yS5F/gK/ovfH/1dkQ5
-# NumrYrYlQWFnU/dmk4/4qxZepPjxfIgPDlLKNvTQkzFh8OfBikj5cPRp44NO2iVq
-# tbr3dsJeUefBnGQT64pkyAoKKvayIcgYlwe4PgLkcmazFNJvE2ERHZgXVRooDl/Y
-# Hh8c7qa6UqDL+R6+BwaROI/R6NsCBmOIi3dr9hpf9nOIjhCTxBp3+f4exsy2gzCe
-# P+CPNgM4yosUCMTZwqCZuxae55FbWTjEWEolw2v58ckHGbNRJdH0bSqyf+OesSuY
-# 06HavgOjk+33PDJP4Ae+WO2sP82pA6HvXWIwFFeLBeveve+W1Y9UsnjZ8BMDW7VA
-# Fdz3ZT/104hwpQ4qaiIexU+6VHBoaTaqnS3uFicT1ZrTBS3qUpYOlZ4lfIXfW1nr
-# w0IhSq07dqZwkabeKYGc38mONShwkaoQa3xK9YO5lM2M41l1P8H6kTn4JQyt5rzt
-# SuSQfo+q
+# SIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI0MDUxNTE5MTg0
+# MlowLwYJKoZIhvcNAQkEMSIEIGuJNJLQf+RghYG7qiB5m8eI9eW5c0dsZhfP02Np
+# 7YbbMA0GCSqGSIb3DQEBAQUABIICAGS9l2IQFO4rNJzb1WU2VqK5EkleYZBp5kXM
+# TfrEiLFXElg5p7yN81tC2kGrmYClOCKuRhu8R5QOxusQWqjNrBmHD+Z7ce18yZpH
+# ap5ZDekZE6ykN9ZksoJObr2gloXlFEAblj0AL5EjMOXRWXaCikYqHLj1bjJRZ/47
+# aIXFYJmBtN3OOwoWEb4nAOS16FFxeZhPOWOMbfrYAyFkUTcnop6EuuBHbb6L06TI
+# pk1FRYFBsk9SnStxRuebAItVfZgQA5gkYqCC5lEbyxFuugjI+2TZts+8Pcjlmfc3
+# NN8XnWqwCKaIUBVz80LUBlcnondmrwG9JM6A8hwbw7T7qFNSX8GqV2R5UQh3UBXt
+# +cS7uqAMq5HPqpNjqt5XiscSHlF2qIifSfqh3rwaE3jX/nn93OTvD2SvaZEznm3u
+# cEE1uS6iFT0LHGRrjP6cxA8Ua8QJ/Ko1tffyKJOc4S81sLkQgS+5FrKsl1cazB1w
+# 7wsY+aP4s3WjbGXD3wqJUQ1VrU1JlHT97XfgnNVewAH49TVFNsJsuwrWyeK5fAzc
+# hqvf3ylF6BhmCGwc40HHtIr8GdTqaj9xb/rEU1vslTpdGsYSfWz27cbBaA0wSqYK
+# eDoHOX9W4vQ2zRLxCs/6/L+XCb5u+EvOD90mQN0qp3XF/FIIDkGWNMzlNXCSIyCe
+# 6n03d9UY
 # SIG # End signature block

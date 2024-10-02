@@ -110,6 +110,8 @@ function Execute-CompleteAction {
 function Update-Pip {
     try {
         Set-Title 'Updating pip'
+        python -m pip install --upgrade pip
+        Set-Title 'Updating pip packages'
         # Get a list of all installed packages
         $installedPackages = & pip list --format=freeze
     
@@ -189,7 +191,9 @@ function Update-Windows {
         Set-Title 'Updating windows'
         Install-Module PSWindowsUpdate -force
         Import-Module PSWindowsUpdate
+        Get-Command -module PSWindowsUpdate  
         # Get-WindowsUpdate
+        Get-WUInstall -IgnoreUserInput -Acceptall -Download -Install -Verbose
         Add-WUServiceManager -MicrosoftUpdate -Confirm:$false # -ServiceID "7971f918-a847-4430-9279-4a52d1efe18d"
         # Add-WUServiceManager -WindowsUpdate -Confirm:$false # -ServiceID "9482f4b4-e343-43b6-b170-9a65bc822c77"
         Add-WUServiceManager -ServiceID "9482f4b4-e343-43b6-b170-9a65bc822c77" -Confirm:$false

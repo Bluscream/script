@@ -1,0 +1,1 @@
+$null = Set-Clipboard -Value ($args -join " ")

@@ -1,1 +1,1 @@
-$null = Set-Clipboard -Value ($args -join " ")
+Set-Clipboard -Value ($args -join " ")

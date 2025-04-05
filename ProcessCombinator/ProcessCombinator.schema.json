@@ -1,0 +1,99 @@
+{
+	"$schema": "http://json-schema.org/draft-04/schema#",
+	"type": "object",
+	"additionalProperties": false,
+	"properties": {
+	  "Processes": {
+		"type": "array",
+		"items": {
+		  "$ref": "#/definitions/ProcessConfig"
+		}
+	  },
+	  "CheckInterval": {
+		"type": "string",
+		"format": "time-span",
+		"default": "00:00:01"
+	  },
+	  "LogToConsole": {
+		"type": "boolean",
+		"default": false
+	  },
+	  "LogToFile": {
+		"type": "boolean",
+		"default": false
+	  }
+	},
+	"required": [
+	  "Processes",
+	  "CheckInterval",
+	  "LogToConsole",
+	  "LogToFile"
+	],
+	"definitions": {
+	  "ProcessConfig": {
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {
+		  "ProcessName": {
+			"type": "string"
+		  },
+		  "GracePeriod": {
+			"type": ["string", "null"],
+			"format": "time-span",
+			"default": "00:00:05"
+		  },
+		  "SubPrograms": {
+			"type": "array",
+			"items": {
+			  "$ref": "#/definitions/SubProgramData"
+			}
+		  }
+		},
+		"required": [
+		  "ProcessName",
+		  "SubPrograms"
+		]
+	  },
+	  "SubProgramData": {
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {
+		  "ProgramPath": {
+			"type": "string"
+		  },
+		  "WorkingDirectory": {
+			"type": ["string", "null"]
+		  },
+		  "Arguments": {
+			"type": "array",
+			"items": {
+			  "type": "string"
+			}
+		  },
+		  "KeepRunning": {
+			"type": "boolean",
+			"default": false
+		  },
+		  "UseShellExecute": {
+			"type": "boolean",
+			"default": false
+		  },
+		  "CreateNoWindow": {
+			"type": "boolean",
+			"default": false
+		  },
+		  "AlwaysRun": {
+			"type": "boolean",
+			"default": false
+		  },
+		  "Delay": {
+			"type": ["string", "null"],
+			"format": "time-span"
+		  }
+		},
+		"required": [
+		  "ProgramPath"
+		]
+	  }
+	}
+  }

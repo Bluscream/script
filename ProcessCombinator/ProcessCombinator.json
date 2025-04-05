@@ -1,0 +1,106 @@
+{
+  "$schema": "file:///D:/Scripts/ProcessCombinator/ProcessCombinator.schema.json",
+  "Processes": [
+    {
+      "ProcessName": "vrchat",
+      "GracePeriod": "00:01:00",
+      "SubPrograms": [
+        {
+          "ProgramPath": "C:\\Program Files\\VRCX\\VRCX.exe",
+          "KeepRunning": true
+        }
+      ]
+    },
+    {
+      "ProcessName": "vrserver",
+      "GracePeriod": "00:00:30",
+      "SubPrograms": []
+    },
+    {
+      "ProcessName": "starcitizen",
+      "GracePeriod": "00:00:05",
+      "SubPrograms": [
+        {
+          "ProgramPath": "C:\\Users\\blusc\\OneDrive\\Games\\Star Citizen\\_TOOLS\\WingmanAI\\WingmanAI.exe",
+          "Arguments": []
+        }
+      ]
+    },
+    {
+      "ProcessName": "BattleBit",
+      "GracePeriod": "00:00:05",
+      "Enabled": false,
+      "SubPrograms": [
+        {
+          "ProgramPath": "D:\\OneDrive\\AHK\\lghub.exe",
+          "Arguments": [
+            "D:\\OneDrive\\AHK\\Scripts\\bbr.ahk"
+          ],
+          "Enabled": false
+        },
+        {
+          "ProgramPath": "C:\\Program Files (x86)\\Overwolf\\OverwolfLauncher.exe",
+          "Arguments": [
+            "--disable-sentry-report -DisableBlackList -launchapp afehdjljenjhcobkfkjempogpejbagjjmphpkglk"
+          ],
+          "AlwaysRun": true,
+          "Enabled": false
+        }
+      ]
+    },
+    {
+      "ProcessName": "HarshDoorstop",
+      "GracePeriod": "00:00:05",
+      "SubPrograms": [
+        {
+          "ProgramPath": "D:\\OneDrive\\AHK\\lghub.exe",
+          "Arguments": [
+            "D:\\OneDrive\\AHK\\Scripts\\ohd.ahk"
+          ]
+        },
+        {
+          "ProgramPath": "C:\\Program Files (x86)\\Overwolf\\OverwolfLauncher.exe",
+          "Arguments": [
+            "--disable-sentry-report -DisableBlackList -launchapp afehdjljenjhcobkfkjempogpejbagjjmphpkglk"
+          ],
+          "AlwaysRun": true
+        }
+      ]
+    },
+    {
+      "ProcessName": "HarshDoorstop-Win64-Shipping",
+      "GracePeriod": "00:00:05",
+      "SubPrograms": [
+        {
+          "ProgramPath": "D:\\OneDrive\\AHK\\lghub.exe",
+          "Arguments": [
+            "D:\\OneDrive\\AHK\\Scripts\\ohd.ahk"
+          ]
+        },
+        {
+          "ProgramPath": "C:\\Program Files (x86)\\Overwolf\\OverwolfLauncher.exe",
+          "Arguments": [
+            "--disable-sentry-report -DisableBlackList -forceoverlay -launchapp afehdjljenjhcobkfkjempogpejbagjjmphpkglk"
+          ]
+        }
+      ]
+    },
+    {
+      "ProcessName": "YouTube Music",
+      "SubPrograms": [
+        {
+          "KeepRunning": false,
+          "ProgramPath": "d:\\WSCC\\Apps\\SoundVolumeView.exe",
+          "Arguments": [
+            "/SetAppDefault \"Voicemeeter VAIO3 Input\" all \"YouTube Music.exe\""
+          ],
+          "AlwaysRun": true,
+          "Delay": "00:00:05"
+        }
+      ]
+    }
+  ],
+  "CheckInterval": "00:00:01",
+  "LogToConsole": true,
+  "LogToFile": true
+}

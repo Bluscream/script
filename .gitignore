@@ -26,6 +26,9 @@ answer.plite
 /tasks
 /reg
 HKU/*
-*/*
 *.lnk
 *.txt
+hmdq/
+* copy.*
+*- Copy (*).ini
+*.disabled

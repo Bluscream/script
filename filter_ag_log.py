@@ -1,8 +1,8 @@
 from json import dump, load
 from pathlib import Path
 
-app = 'CODMVM_LAUNCHER.exe'
-file = Path("C:/Users/blusc/Desktop/20230531_adguard_filtering_log_records.json")
+app = 'Shadow.exe'
+file = Path("C:/Users/Bluscream/Desktop/20250130_adguard_filtering_log_records.json")
 data = None
 with open(file, "rb") as f: data = load(f)
 records = []

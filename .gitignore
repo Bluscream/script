@@ -25,3 +25,7 @@ answer.plite
 /powerprofiles
 /tasks
 /reg
+HKU/*
+*/*
+*.lnk
+*.txt

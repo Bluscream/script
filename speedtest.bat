@@ -1,0 +1,1 @@
+start speedtest.exe -i 192.168.3.52 -s 29320 & speedtest.exe -i 192.168.2.51 -s 29320

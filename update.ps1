@@ -108,12 +108,15 @@ function Execute-CompleteAction {
 }
 
 function Update-Pip {
+    param (
+        [string]$bin
+    )
     try {
-        Set-Title 'Updating pip'
-        python -m pip install --upgrade pip
-        Set-Title 'Updating pip packages'
+        Set-Title "Updating $bin pip"
+        iex "$bin -m pip install --upgrade pip wheel setuptools"
+        Set-Title "Updating $bin pip packages"
         # Get a list of all installed packages
-        $installedPackages = & pip list --format=freeze
+        $installedPackages = iex "$bin -m pip list --format=freeze"
     
         # Iterate over each package and upgrade it
         foreach ($package in $installedPackages) {
@@ -121,7 +124,7 @@ function Update-Pip {
             $packageName = $package.Split("==")[0]
     
             # Upgrade the package
-            & pip install --upgrade $packageName
+            & $bin -m pip install --upgrade $packageName
         }
         return $true
     }
@@ -229,7 +232,11 @@ if ($all -or $default -or $windows) { $windows_success = Update-Windows }
 
 if ($all -or $default -or $npm) { $npm_success = Update-Npm }
 
-if ($all -or $default -or $pip) { $pip_success = Update-Pip }
+if ($all -or $default -or $pip) {
+    $pip_success = Update-Pip "python"
+    $pip_success = Update-Pip "python2"
+    $pip_success = Update-Pip "python3"
+}
 
 if ($all -or $default -or $winget) { $winget_success = Update-Winget }
 

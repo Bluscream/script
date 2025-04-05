@@ -1,0 +1,1 @@
+taskkill /f /im cmd.exe && taskkill /f /im conhost.exe && taskkill /f /im openconsole.exe

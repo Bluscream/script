@@ -7,7 +7,7 @@
 
 # Exclude .NET assemblies from source
 *.dll
-
+ 
 # End of https://www.toptal.com/developers/gitignore/api/powershell
 out.txt
 output.json
